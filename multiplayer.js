@@ -264,8 +264,13 @@
   function getMultiplayerQuestionIndexes(categoryId) {
     if (!Array.isArray(quizData)) return [];
 
-    const source = categoryId === "random"
-      ? quizData.map((_, index) => index)
+    const source = categoryId === "random" && typeof getEnabledCategoryIds === "function"
+      ? quizData
+        .map((quiz, index) => ({ quiz, index }))
+        .filter((item) => getEnabledCategoryIds().includes(item.quiz.category))
+        .map((item) => item.index)
+      : categoryId === "random"
+        ? quizData.map((_, index) => index)
       : quizData
         .map((quiz, index) => ({ quiz, index }))
         .filter((item) => item.quiz.category === categoryId)
@@ -506,9 +511,18 @@
     const hasWinner = Boolean(currentRound.winnerId);
     const isTimeOver = Boolean(currentRound.isTimeOver);
     const roundEnded = hasWinner || isTimeOver;
+    const actualCategoryName = typeof getCategoryName === "function"
+      ? getCategoryName(question?.category)
+      : question?.category || "랜덤";
+    const selectedCategoryName = typeof getCategoryName === "function"
+      ? getCategoryName(room?.category)
+      : room?.category || "랜덤";
+    const roomLabelCategory = room?.category === "random"
+      ? `랜덤 · ${actualCategoryName}`
+      : selectedCategoryName;
 
     resetRoundInputIfNeeded(room);
-    setText(multiRoomLabel, `방 코드 ${currentRoomCode || room?.code || "----"}`);
+    setText(multiRoomLabel, `방 코드 ${currentRoomCode || room?.code || "----"} · ${roomLabelCategory}`);
     setText(multiQuestionCount, `문제 ${currentIndex + 1} / ${questionTotal}`);
     setText(multiMyScore, me.score || 0);
     setText(multiEmojiText, question?.emoji || "🎮");
@@ -919,9 +933,12 @@
   function populateCategorySelect() {
     if (!multiCategorySelect || typeof categories === "undefined") return;
 
-    multiCategorySelect.innerHTML = categories.map((category) => (
-      `<option value="${category.id}">${escapeHtml(category.name)}</option>`
-    )).join("");
+    multiCategorySelect.innerHTML = categories
+      .filter((category) => !category.disabled)
+      .map((category) => (
+        `<option value="${category.id}">${escapeHtml(category.name)}</option>`
+      ))
+      .join("");
   }
 
   function bindEvents() {

@@ -212,6 +212,21 @@ h2 {
   font-size: 13px;
 }
 
+.category-btn.disabled-category {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.category-btn.disabled-category:active {
+  transform: none;
+}
+
+.category-btn .coming-soon {
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .quiz-header {
   gap: 14px;
 }
