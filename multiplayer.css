@@ -78,6 +78,25 @@
   font-size: 14px;
 }
 
+.resume-room-box {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff4e7;
+}
+
+.resume-room-box p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.resume-room-box .room-share-actions {
+  margin-top: 0;
+}
+
 .timer-text {
   margin: 8px 0 0;
   color: var(--muted);

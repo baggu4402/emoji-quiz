@@ -1,5 +1,6 @@
 (() => {
   const PLAYER_ID_KEY = "emojiQuizPlayerId";
+  const LAST_ROOM_KEY = "emojiQuizLastRoom";
   const unavailableMessage = "멀티플레이는 Firebase 설정 후 사용할 수 있습니다.";
   const authFailedMessage = "멀티플레이 인증에 실패했습니다. Firebase Anonymous Auth 설정을 확인해주세요.";
   const roundReadyMessage = "가장 먼저 맞히면 +10점";
@@ -28,6 +29,10 @@
   const startRoomGameBtn = document.querySelector("#start-room-game-btn");
   const playerNameInput = document.querySelector("#player-name-input");
   const roomCodeInput = document.querySelector("#room-code-input");
+  const resumeRoomBox = document.querySelector("#resume-room-box");
+  const resumeRoomText = document.querySelector("#resume-room-text");
+  const resumeRoomBtn = document.querySelector("#resume-room-btn");
+  const clearResumeRoomBtn = document.querySelector("#clear-resume-room-btn");
   const roomCodeDisplay = document.querySelector("#room-code-display");
   const copyRoomCodeBtn = document.querySelector("#copy-room-code-btn");
   const copyInviteLinkBtn = document.querySelector("#copy-invite-link-btn");
@@ -161,6 +166,85 @@
     }
 
     return currentPlayerId || getFallbackPlayerId();
+  }
+
+  function saveLastRoomSession(roomCode, playerName) {
+    if (!roomCode || !playerName) return;
+
+    const payload = {
+      roomCode,
+      playerName,
+      savedAt: Date.now(),
+    };
+
+    try {
+      localStorage.setItem(LAST_ROOM_KEY, JSON.stringify(payload));
+    } catch (error) {
+      console.warn("Failed to save last room session", error);
+    }
+  }
+
+  function clearLastRoomSession() {
+    try {
+      localStorage.removeItem(LAST_ROOM_KEY);
+    } catch (error) {
+      console.warn("Failed to clear last room session", error);
+    }
+  }
+
+  function getLastRoomSession() {
+    try {
+      const raw = localStorage.getItem(LAST_ROOM_KEY);
+      if (!raw) return null;
+
+      const data = JSON.parse(raw);
+      if (!data?.roomCode || !data?.playerName || !data?.savedAt) return null;
+
+      const maxAge = 2 * 60 * 60 * 1000;
+      if (Date.now() - data.savedAt > maxAge) {
+        clearLastRoomSession();
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      clearLastRoomSession();
+      return null;
+    }
+  }
+
+  function renderResumeRoomBox() {
+    if (!resumeRoomBox) return;
+
+    if (getRoomCodeFromUrl()) {
+      resumeRoomBox.classList.add("hidden");
+      return;
+    }
+
+    const lastRoom = getLastRoomSession();
+    if (!lastRoom) {
+      resumeRoomBox.classList.add("hidden");
+      return;
+    }
+
+    resumeRoomBox.classList.remove("hidden");
+
+    if (resumeRoomText) {
+      resumeRoomText.textContent = `이전에 참가한 방 ${lastRoom.roomCode}가 있습니다. 닉네임 ${lastRoom.playerName}으로 복귀할 수 있습니다.`;
+    }
+
+    if (playerNameInput && !playerNameInput.value.trim()) {
+      playerNameInput.value = lastRoom.playerName;
+    }
+
+    if (roomCodeInput && !roomCodeInput.value.trim()) {
+      roomCodeInput.value = lastRoom.roomCode;
+    }
+  }
+
+  function isLastRoomCode(roomCode) {
+    const lastRoom = getLastRoomSession();
+    return Boolean(lastRoom && lastRoom.roomCode === roomCode);
   }
 
   async function ensureAnonymousAuth() {
@@ -718,6 +802,8 @@
 
     if (!room) {
       clearRoomSubscription();
+      clearLastRoomSession();
+      renderResumeRoomBox();
       latestRoom = null;
       currentRoomCode = "";
       isHost = false;
@@ -857,12 +943,15 @@
 
     await db.ref(`rooms/${roomCode}`).set(roomData);
     isHost = true;
+    saveLastRoomSession(roomCode, currentPlayerName);
+    renderResumeRoomBox();
     updateDebugPanel(roomData);
     setMenuStatus("");
     enterRoomScreen(roomCode);
   }
 
-  async function joinRoom() {
+  async function joinRoom(options = {}) {
+    const isResume = Boolean(options.resume);
     currentPlayerName = getPlayerName();
     const roomCode = getRoomCodeInput();
     const nameError = validatePlayerName(currentPlayerName);
@@ -895,7 +984,16 @@
     const roomSnapshot = await db.ref(`rooms/${roomCode}`).get();
 
     if (!roomSnapshot.exists()) {
-      setMenuStatus("존재하지 않는 방입니다.");
+      if (isResume || isLastRoomCode(roomCode)) {
+        clearLastRoomSession();
+        renderResumeRoomBox();
+      }
+
+      if (isResume) {
+        setMenuStatus("이전 방이 더 이상 존재하지 않습니다.", "error");
+      } else {
+        setMenuStatus("존재하지 않는 방입니다.");
+      }
       return;
     }
 
@@ -904,12 +1002,21 @@
     const existingPlayer = players[currentPlayerId];
     const playerEntries = Object.values(players);
 
-    if (room.status !== "waiting") {
+    if (room.status === "finished") {
+      if (isResume || isLastRoomCode(roomCode)) {
+        clearLastRoomSession();
+        renderResumeRoomBox();
+      }
+      setMenuStatus(isResume ? "이전 방이 이미 종료되었습니다." : "이미 종료된 방입니다.", "error");
+      return;
+    }
+
+    if (room.status !== "waiting" && !existingPlayer) {
       setMenuStatus("이미 시작되었거나 종료된 방입니다.");
       return;
     }
 
-    if (playerEntries.length >= MAX_ROOM_PLAYERS && !existingPlayer) {
+    if (room.status === "waiting" && playerEntries.length >= MAX_ROOM_PLAYERS && !existingPlayer) {
       setMenuStatus("방 인원이 가득 찼습니다.");
       return;
     }
@@ -935,6 +1042,8 @@
 
     await db.ref(`rooms/${roomCode}/players/${currentPlayerId}`).set(playerData);
     isHost = room.hostId === currentPlayerId || playerData.isHost;
+    saveLastRoomSession(roomCode, currentPlayerName);
+    renderResumeRoomBox();
     updateDebugPanel(room);
     setMenuStatus("");
     enterRoomScreen(roomCode);
@@ -945,6 +1054,7 @@
     const playerId = currentPlayerId;
     const hostLeaving = isHost;
 
+    clearLastRoomSession();
     clearRoomSubscription();
 
     if (db && roomCode && playerId) {
@@ -980,6 +1090,7 @@
     renderMultiplayerScoreboard({});
     setText(roomCodeDisplay, "----");
     setRoomStatus("");
+    renderResumeRoomBox();
 
     showScreenSafe(goHome ? "home-screen" : "multiplayer-menu-screen");
   }
@@ -1146,7 +1257,37 @@
       if (!applyRoomCodeFromUrl(true)) {
         setMenuStatus("");
       }
+      renderResumeRoomBox();
       showScreenSafe("multiplayer-menu-screen");
+    });
+
+    resumeRoomBtn?.addEventListener("click", () => {
+      const lastRoom = getLastRoomSession();
+
+      if (!lastRoom) {
+        setMenuStatus("복귀할 방 정보가 없습니다.", "error");
+        renderResumeRoomBox();
+        return;
+      }
+
+      if (playerNameInput) {
+        playerNameInput.value = lastRoom.playerName;
+      }
+
+      if (roomCodeInput) {
+        roomCodeInput.value = lastRoom.roomCode;
+      }
+
+      joinRoom({ resume: true }).catch((error) => {
+        setLastFirebaseError(error);
+        setMenuStatus("이전 방으로 복귀할 수 없습니다. 잠시 후 다시 시도해주세요.", "error");
+      });
+    });
+
+    clearResumeRoomBtn?.addEventListener("click", () => {
+      clearLastRoomSession();
+      renderResumeRoomBox();
+      setMenuStatus("이전 방 기록을 지웠습니다.", "success");
     });
 
     copyRoomCodeBtn?.addEventListener("click", () => {
@@ -1264,6 +1405,7 @@
   if (applyRoomCodeFromUrl(true)) {
     showScreenSafe("multiplayer-menu-screen");
   }
+  renderResumeRoomBox();
   updateHostControls();
   bindEvents();
 })();

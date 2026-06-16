@@ -105,6 +105,14 @@
         <label class="field-label" for="player-name-input">닉네임</label>
         <input id="player-name-input" class="answer-input" type="text" maxlength="10" placeholder="예: 백구" autocomplete="off" />
 
+        <div id="resume-room-box" class="resume-room-box hidden">
+          <p id="resume-room-text">이전에 참가한 방이 있습니다.</p>
+          <div class="room-share-actions">
+            <button id="resume-room-btn" class="secondary-btn" type="button">이전 방으로 복귀</button>
+            <button id="clear-resume-room-btn" class="ghost-btn" type="button">기록 지우기</button>
+          </div>
+        </div>
+
         <div class="button-group compact-group">
           <button id="create-room-btn" class="primary-btn">방 만들기</button>
         </div>
