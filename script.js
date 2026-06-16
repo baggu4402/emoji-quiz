@@ -75,6 +75,7 @@ let correctCount = 0;
 let wrongCount = 0;
 let hintUsed = false;
 let answered = false;
+let previousSoloScreen = "home-screen";
 
 const screens = document.querySelectorAll(".screen");
 const homeBestScore = document.querySelector("#home-best-score");
@@ -90,6 +91,9 @@ const submitBtn = document.querySelector("#submit-btn");
 const hintBtn = document.querySelector("#hint-btn");
 const showAnswerBtn = document.querySelector("#show-answer-btn");
 const nextBtn = document.querySelector("#next-btn");
+const soloBackBtn = document.querySelector("#solo-back-btn");
+const multiplayerOpenBtn = document.querySelector("#multiplayer-open-btn");
+const multiMenuStatus = document.querySelector("#multi-menu-status");
 const finalScore = document.querySelector("#final-score");
 const bestMessage = document.querySelector("#best-message");
 const correctCountText = document.querySelector("#correct-count");
@@ -98,6 +102,32 @@ const wrongCountText = document.querySelector("#wrong-count");
 function showScreen(screenId) {
   screens.forEach((screen) => screen.classList.remove("active"));
   document.querySelector(`#${screenId}`).classList.add("active");
+}
+
+function isFirebaseReady() {
+  return Boolean(
+    window.firebaseConfig &&
+    window.firebase &&
+    typeof window.firebase.initializeApp === "function" &&
+    typeof window.firebase.database === "function"
+  );
+}
+
+function showMultiplayerUnavailable() {
+  showScreen("multiplayer-menu-screen");
+
+  if (multiMenuStatus) {
+    multiMenuStatus.textContent = "멀티플레이는 Firebase 설정 후 사용할 수 있습니다.";
+  }
+}
+
+function openMultiplayerMenu() {
+  if (!isFirebaseReady()) {
+    showMultiplayerUnavailable();
+    return;
+  }
+
+  showScreen("multiplayer-menu-screen");
 }
 
 function getBestScore() {
@@ -144,11 +174,12 @@ function buildCategoryButtons() {
   }).join("");
 
   document.querySelectorAll(".category-btn").forEach((button) => {
-    button.addEventListener("click", () => startGame(button.dataset.category));
+    button.addEventListener("click", () => startGame(button.dataset.category, "category-screen"));
   });
 }
 
-function startGame(categoryId = "random") {
+function startGame(categoryId = "random", previousScreen = "home-screen") {
+  previousSoloScreen = previousScreen;
   selectedCategory = categoryId;
   questions = shuffle(getQuestionsByCategory(categoryId)).slice(0, QUESTION_LIMIT);
   currentIndex = 0;
@@ -271,13 +302,19 @@ function showResult() {
 }
 
 function bindEvents() {
-  document.querySelector("#quick-start-btn").addEventListener("click", () => startGame("random"));
+  document.querySelector("#quick-start-btn").addEventListener("click", () => startGame("random", "home-screen"));
+  if (multiplayerOpenBtn) {
+    multiplayerOpenBtn.addEventListener("click", openMultiplayerMenu);
+  }
   document.querySelector("#category-open-btn").addEventListener("click", () => showScreen("category-screen"));
   document.querySelector("#how-to-btn").addEventListener("click", () => showScreen("how-to-screen"));
   document.querySelector("#retry-btn").addEventListener("click", () => startGame(selectedCategory));
   document.querySelector("#home-btn").addEventListener("click", () => showScreen("home-screen"));
+  if (soloBackBtn) {
+    soloBackBtn.addEventListener("click", () => showScreen(previousSoloScreen || "home-screen"));
+  }
 
-  document.querySelectorAll(".back-btn").forEach((button) => {
+  document.querySelectorAll(".back-btn[data-target]").forEach((button) => {
     button.addEventListener("click", () => showScreen(button.dataset.target));
   });
 

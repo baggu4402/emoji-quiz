@@ -1,0 +1,80 @@
+.status-text {
+  min-height: 24px;
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-weight: 800;
+  text-align: center;
+}
+
+.room-card {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 28px;
+  padding: 24px 20px;
+  box-shadow: var(--shadow);
+}
+
+.compact-group {
+  margin-top: 12px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.field-label {
+  display: block;
+  margin: 14px 0 8px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.select-input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: #fffaf4;
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+}
+
+.room-code {
+  margin: 12px 0;
+  color: var(--primary-dark);
+  font-size: 42px;
+  font-weight: 900;
+  text-align: center;
+  letter-spacing: 0.12em;
+}
+
+.player-panel,
+.scoreboard,
+.leaderboard {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 20px;
+  background: #fff8ef;
+}
+
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
