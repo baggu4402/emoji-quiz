@@ -31,7 +31,9 @@
   const roomStatusText = document.querySelector("#room-status-text");
   const multiMenuStatus = document.querySelector("#multi-menu-status");
   const multiCategorySelect = document.querySelector("#multi-category-select");
+  const multiDifficultySelect = document.querySelector("#multi-difficulty-select");
   const multiRoomLabel = document.querySelector("#multi-room-label");
+  const multiDifficultyLabel = document.querySelector("#multi-difficulty-label");
   const multiQuestionCount = document.querySelector("#multi-question-count");
   const multiTimerText = document.querySelector("#multi-timer-text");
   const multiMyScore = document.querySelector("#multi-my-score");
@@ -257,14 +259,18 @@
     return multiCategorySelect?.value || "random";
   }
 
+  function getSelectedDifficulty() {
+    return multiDifficultySelect?.value || "all";
+  }
+
   function getQuestionLimit() {
     return typeof QUESTION_LIMIT === "number" ? QUESTION_LIMIT : 10;
   }
 
-  function getMultiplayerQuestionIndexes(categoryId) {
+  function getMultiplayerQuestionIndexes(categoryId, difficultyId = "all") {
     if (!Array.isArray(quizData)) return [];
 
-    const source = categoryId === "random" && typeof getEnabledCategoryIds === "function"
+    let source = categoryId === "random" && typeof getEnabledCategoryIds === "function"
       ? quizData
         .map((quiz, index) => ({ quiz, index }))
         .filter((item) => getEnabledCategoryIds().includes(item.quiz.category))
@@ -275,6 +281,10 @@
         .map((quiz, index) => ({ quiz, index }))
         .filter((item) => item.quiz.category === categoryId)
         .map((item) => item.index);
+
+    if (difficultyId !== "all") {
+      source = source.filter((index) => quizData[index]?.difficulty === difficultyId);
+    }
 
     return shuffleValues(source).slice(0, getQuestionLimit());
   }
@@ -388,6 +398,10 @@
       multiCategorySelect.disabled = !isHost || room?.status !== "waiting";
     }
 
+    if (multiDifficultySelect) {
+      multiDifficultySelect.disabled = !isHost || room?.status !== "waiting";
+    }
+
     if (!startRoomGameBtn) return;
 
     startRoomGameBtn.disabled = !isHost;
@@ -401,6 +415,10 @@
 
     if (multiCategorySelect && room?.category) {
       multiCategorySelect.value = room.category;
+    }
+
+    if (multiDifficultySelect) {
+      multiDifficultySelect.value = room?.difficulty || "all";
     }
 
     updateHostControls(room);
@@ -523,6 +541,13 @@
 
     resetRoundInputIfNeeded(room);
     setText(multiRoomLabel, `방 코드 ${currentRoomCode || room?.code || "----"} · ${roomLabelCategory}`);
+    if (multiDifficultyLabel) {
+      const difficulty = question?.difficulty || "normal";
+      multiDifficultyLabel.textContent = typeof getDifficultyText === "function"
+        ? getDifficultyText(difficulty)
+        : difficulty;
+      multiDifficultyLabel.className = `difficulty-label ${difficulty}`;
+    }
     setText(multiQuestionCount, `문제 ${currentIndex + 1} / ${questionTotal}`);
     setText(multiMyScore, me.score || 0);
     setText(multiEmojiText, question?.emoji || "🎮");
@@ -674,11 +699,13 @@
     const roomCode = await findAvailableRoomCode();
     const now = Date.now();
     const category = getSelectedCategory();
+    const difficulty = getSelectedDifficulty();
     const roomData = {
       code: roomCode,
       status: "waiting",
       hostId: currentPlayerId,
       category,
+      difficulty,
       currentQuestionIndex: 0,
       createdAt: now,
       players: {
@@ -812,6 +839,12 @@
     await roomRef.update({ category: getSelectedCategory() });
   }
 
+  async function updateRoomDifficulty() {
+    if (!roomRef || !isHost || latestRoom?.status !== "waiting") return;
+
+    await roomRef.update({ difficulty: getSelectedDifficulty() });
+  }
+
   async function startRoomGame() {
     if (!isHost || !currentRoomCode) return;
 
@@ -821,16 +854,18 @@
     }
 
     const category = getSelectedCategory();
-    const questionIndexes = getMultiplayerQuestionIndexes(category);
+    const difficulty = getSelectedDifficulty();
+    const questionIndexes = getMultiplayerQuestionIndexes(category, difficulty);
 
     if (!questionIndexes.length) {
-      setRoomStatus("선택한 카테고리에 문제가 없습니다.");
+      setRoomStatus("선택한 조건에 맞는 문제가 없습니다.");
       return;
     }
 
     await db.ref(`rooms/${currentRoomCode}`).update({
       status: "playing",
       category,
+      difficulty,
       questionIndexes,
       currentQuestionIndex: 0,
       currentRound: {
@@ -941,6 +976,14 @@
       .join("");
   }
 
+  function populateDifficultySelect() {
+    if (!multiDifficultySelect || typeof difficulties === "undefined") return;
+
+    multiDifficultySelect.innerHTML = difficulties.map((difficulty) => (
+      `<option value="${difficulty.id}">${escapeHtml(difficulty.name)}</option>`
+    )).join("");
+  }
+
   function bindEvents() {
     multiplayerOpenBtn?.addEventListener("click", () => {
       if (!applyRoomCodeFromUrl(true)) {
@@ -1039,9 +1082,16 @@
         setRoomStatus("카테고리를 변경할 수 없습니다. 잠시 후 다시 시도해주세요.");
       });
     });
+
+    multiDifficultySelect?.addEventListener("change", () => {
+      updateRoomDifficulty().catch(() => {
+        setRoomStatus("난이도를 변경할 수 없습니다. 잠시 후 다시 시도해주세요.");
+      });
+    });
   }
 
   populateCategorySelect();
+  populateDifficultySelect();
   if (applyRoomCodeFromUrl(true)) {
     showScreenSafe("multiplayer-menu-screen");
   }

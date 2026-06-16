@@ -10,6 +10,13 @@ const categories = [
   { id: "meme", name: "상황/밈", icon: "😂", disabled: true },
 ];
 
+const difficulties = [
+  { id: "all", name: "전체" },
+  { id: "easy", name: "쉬움" },
+  { id: "normal", name: "보통" },
+  { id: "hard", name: "어려움" },
+];
+
 const quizData = [
   {
     "id": 1,
@@ -2418,6 +2425,7 @@ const quizData = [
 ];
 
 let selectedCategory = "random";
+let selectedDifficulty = "all";
 let questions = [];
 let currentIndex = 0;
 let score = 0;
@@ -2429,9 +2437,11 @@ let previousSoloScreen = "home-screen";
 
 const screens = document.querySelectorAll(".screen");
 const homeBestScore = document.querySelector("#home-best-score");
+const soloDifficultyList = document.querySelector("#solo-difficulty-list");
 const categoryList = document.querySelector("#category-list");
 const categoryStatusText = document.querySelector("#category-status-text");
 const categoryLabel = document.querySelector("#category-label");
+const difficultyLabel = document.querySelector("#difficulty-label");
 const questionCount = document.querySelector("#question-count");
 const scoreText = document.querySelector("#score-text");
 const emojiText = document.querySelector("#emoji-text");
@@ -2526,6 +2536,16 @@ function getCategoryName(categoryId) {
   return categories.find((category) => category.id === categoryId)?.name || "랜덤";
 }
 
+function getDifficultyText(difficulty) {
+  const labels = {
+    easy: "쉬움",
+    normal: "보통",
+    hard: "어려움",
+  };
+
+  return labels[difficulty] || "보통";
+}
+
 function getEnabledCategoryIds() {
   return categories
     .filter((category) => !category.disabled && category.id !== "random")
@@ -2546,9 +2566,50 @@ function getQuestionsByCategory(categoryId) {
   return quizData.filter((quiz) => quiz.category === categoryId);
 }
 
+function getQuestionsByCategoryAndDifficulty(categoryId, difficultyId = "all") {
+  let source = getQuestionsByCategory(categoryId);
+
+  if (difficultyId !== "all") {
+    source = source.filter((quiz) => quiz.difficulty === difficultyId);
+  }
+
+  return source;
+}
+
+function updateSoloDifficultyUI() {
+  document.querySelectorAll(".difficulty-option-btn").forEach((button) => {
+    button.classList.toggle("active", button.dataset.difficulty === selectedDifficulty);
+  });
+}
+
+function buildSoloDifficultyButtons() {
+  if (!soloDifficultyList) return;
+
+  soloDifficultyList.innerHTML = difficulties.map((difficulty) => `
+    <button class="difficulty-option-btn" data-difficulty="${difficulty.id}" type="button">
+      ${difficulty.name}
+    </button>
+  `).join("");
+
+  document.querySelectorAll(".difficulty-option-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedDifficulty = button.dataset.difficulty || "all";
+      updateSoloDifficultyUI();
+      buildCategoryButtons();
+
+      if (categoryStatusText) {
+        categoryStatusText.textContent = "";
+        categoryStatusText.className = "status-text";
+      }
+    });
+  });
+
+  updateSoloDifficultyUI();
+}
+
 function buildCategoryButtons() {
   categoryList.innerHTML = categories.map((category) => {
-    const count = getQuestionsByCategory(category.id).length;
+    const count = getQuestionsByCategoryAndDifficulty(category.id, selectedDifficulty).length;
     const disabledClass = category.disabled ? " disabled-category" : "";
     const countText = category.disabled ? "준비중" : `문제 ${count}개`;
     return `
@@ -2583,11 +2644,13 @@ function buildCategoryButtons() {
 }
 
 function startGame(categoryId = "random", previousScreen = "home-screen") {
-  const nextQuestions = shuffle(getQuestionsByCategory(categoryId)).slice(0, QUESTION_LIMIT);
+  const nextQuestions = shuffle(
+    getQuestionsByCategoryAndDifficulty(categoryId, selectedDifficulty)
+  ).slice(0, QUESTION_LIMIT);
 
   if (!nextQuestions.length) {
     if (categoryStatusText) {
-      categoryStatusText.textContent = "선택한 카테고리에 문제가 없습니다.";
+      categoryStatusText.textContent = "선택한 조건에 맞는 문제가 없습니다.";
       categoryStatusText.className = "status-text error";
     }
     showScreen(previousScreen);
@@ -2614,6 +2677,10 @@ function renderQuestion() {
   categoryLabel.textContent = selectedCategory === "random"
     ? `랜덤 · ${actualCategoryName}`
     : getCategoryName(selectedCategory);
+  if (difficultyLabel) {
+    difficultyLabel.textContent = getDifficultyText(currentQuestion.difficulty);
+    difficultyLabel.className = `difficulty-label ${currentQuestion.difficulty || "normal"}`;
+  }
   questionCount.textContent = `문제 ${currentIndex + 1} / ${questions.length}`;
   scoreText.textContent = score;
   emojiText.textContent = currentQuestion.emoji;
@@ -2758,6 +2825,7 @@ function bindEvents() {
 
 function init() {
   updateBestScoreUI();
+  buildSoloDifficultyButtons();
   buildCategoryButtons();
   bindEvents();
 }

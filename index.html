@@ -29,6 +29,11 @@
         <button id="category-open-btn" class="secondary-btn">카테고리 선택</button>
         <button id="how-to-btn" class="ghost-btn">게임 방법</button>
       </div>
+
+      <div class="difficulty-selector">
+        <p class="selector-title">난이도</p>
+        <div id="solo-difficulty-list" class="difficulty-options"></div>
+      </div>
     </section>
 
     <section id="category-screen" class="screen">
@@ -45,6 +50,7 @@
         <button id="solo-back-btn" class="back-btn" type="button">←</button>
         <div>
           <p id="category-label" class="small-label">랜덤</p>
+          <p id="difficulty-label" class="difficulty-label normal">보통</p>
           <h2 id="question-count">문제 1 / 10</h2>
         </div>
         <div class="score-box">
@@ -132,6 +138,9 @@
         <label class="field-label" for="multi-category-select">문제 카테고리</label>
         <select id="multi-category-select" class="select-input"></select>
 
+        <label class="field-label" for="multi-difficulty-select">문제 난이도</label>
+        <select id="multi-difficulty-select" class="select-input"></select>
+
         <div class="player-panel">
           <div class="panel-title-row">
             <h3>참가자</h3>
@@ -151,6 +160,7 @@
       <header class="quiz-header">
         <div>
           <p id="multi-room-label" class="small-label">방 코드 ----</p>
+          <p id="multi-difficulty-label" class="difficulty-label normal">보통</p>
           <h2 id="multi-question-count">문제 1 / 10</h2>
           <p id="multi-timer-text" class="timer-text">남은 시간 20초</p>
         </div>
