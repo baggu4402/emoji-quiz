@@ -3,6 +3,7 @@
   const unavailableMessage = "멀티플레이는 Firebase 설정 후 사용할 수 있습니다.";
   const roundReadyMessage = "가장 먼저 맞히면 +10점";
   const ROUND_TIME_LIMIT_SECONDS = 20;
+  const MAX_ROOM_PLAYERS = 6;
 
   let db = null;
   let currentRoomCode = "";
@@ -141,6 +142,24 @@
     return playerNameInput?.value.trim() || "";
   }
 
+  function normalizePlayerName(name) {
+    return name.trim().replace(/\s+/g, "").toLowerCase();
+  }
+
+  function validatePlayerName(name) {
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      return "닉네임을 입력해주세요.";
+    }
+
+    if (trimmedName.length > 10) {
+      return "닉네임은 10자 이하로 입력해주세요.";
+    }
+
+    return "";
+  }
+
   function getRoomCodeInput() {
     return roomCodeInput?.value.trim().toUpperCase() || "";
   }
@@ -239,6 +258,20 @@
     });
   }
 
+  function renderPlayerBadges(player, hostId = latestRoom?.hostId) {
+    const badges = [];
+
+    if (player.id === hostId || player.isHost) {
+      badges.push(`<span class="host-badge">방장</span>`);
+    }
+
+    if (player.id === currentPlayerId) {
+      badges.push(`<span class="me-badge">나</span>`);
+    }
+
+    return badges.join("");
+  }
+
   function clearRoomSubscription() {
     stopMultiplayerTimer();
 
@@ -265,7 +298,7 @@
       <div class="player-row">
         <span class="player-name">${escapeHtml(player.name || "플레이어")}</span>
         <span class="player-score">${player.score || 0}점</span>
-        ${player.isHost ? `<span class="host-badge">방장</span>` : ""}
+        ${renderPlayerBadges(player)}
       </div>
     `).join("");
   }
@@ -284,7 +317,7 @@
       <div class="player-row">
         <span class="player-name">${escapeHtml(player.name || "플레이어")}</span>
         <span class="player-score">${player.score || 0}점</span>
-        ${player.isHost ? `<span class="host-badge">방장</span>` : ""}
+        ${renderPlayerBadges(player)}
       </div>
     `).join("");
   }
@@ -567,9 +600,10 @@
 
   async function createRoom() {
     currentPlayerName = getPlayerName();
+    const nameError = validatePlayerName(currentPlayerName);
 
-    if (!currentPlayerName) {
-      setMenuStatus("닉네임을 입력해주세요.");
+    if (nameError) {
+      setMenuStatus(nameError);
       return;
     }
 
@@ -613,9 +647,10 @@
   async function joinRoom() {
     currentPlayerName = getPlayerName();
     const roomCode = getRoomCodeInput();
+    const nameError = validatePlayerName(currentPlayerName);
 
-    if (!currentPlayerName) {
-      setMenuStatus("닉네임을 입력해주세요.");
+    if (nameError) {
+      setMenuStatus(nameError);
       return;
     }
 
@@ -629,6 +664,7 @@
       return;
     }
 
+    currentPlayerId = getOrCreatePlayerId();
     const roomSnapshot = await db.ref(`rooms/${roomCode}`).get();
 
     if (!roomSnapshot.exists()) {
@@ -637,15 +673,41 @@
     }
 
     const room = roomSnapshot.val();
+    const players = room.players || {};
+    const existingPlayer = players[currentPlayerId];
+    const playerEntries = Object.values(players);
 
     if (room.status !== "waiting") {
-      setMenuStatus("이미 시작된 방입니다.");
+      setMenuStatus("이미 시작되었거나 종료된 방입니다.");
       return;
     }
 
-    currentPlayerId = getOrCreatePlayerId();
-    await db.ref(`rooms/${roomCode}/players/${currentPlayerId}`).set(getPlayerRecord(false));
-    isHost = false;
+    if (playerEntries.length >= MAX_ROOM_PLAYERS && !existingPlayer) {
+      setMenuStatus("방 인원이 가득 찼습니다.");
+      return;
+    }
+
+    const normalizedName = normalizePlayerName(currentPlayerName);
+    const duplicateNamePlayer = playerEntries.find((player) => (
+      player.id !== currentPlayerId &&
+      normalizePlayerName(player.name || "") === normalizedName
+    ));
+
+    if (duplicateNamePlayer) {
+      setMenuStatus("이미 사용 중인 닉네임입니다.");
+      return;
+    }
+
+    const playerData = {
+      id: currentPlayerId,
+      name: currentPlayerName,
+      score: existingPlayer?.score ?? 0,
+      isHost: existingPlayer?.isHost ?? false,
+      joinedAt: existingPlayer?.joinedAt ?? Date.now(),
+    };
+
+    await db.ref(`rooms/${roomCode}/players/${currentPlayerId}`).set(playerData);
+    isHost = room.hostId === currentPlayerId || playerData.isHost;
     setMenuStatus("");
     enterRoomScreen(roomCode);
   }
@@ -658,10 +720,26 @@
     clearRoomSubscription();
 
     if (db && roomCode && playerId) {
-      if (hostLeaving) {
-        await db.ref(`rooms/${roomCode}`).remove();
-      } else {
+      if (!hostLeaving) {
         await db.ref(`rooms/${roomCode}/players/${playerId}`).remove();
+      } else {
+        const roomSnapshot = await db.ref(`rooms/${roomCode}`).get();
+        const room = roomSnapshot.val();
+        const players = room?.players || {};
+        const remainingPlayers = Object.values(players)
+          .filter((player) => player.id !== playerId)
+          .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+
+        if (!remainingPlayers.length) {
+          await db.ref(`rooms/${roomCode}`).remove();
+        } else {
+          const newHost = remainingPlayers[0];
+          await db.ref().update({
+            [`rooms/${roomCode}/hostId`]: newHost.id,
+            [`rooms/${roomCode}/players/${newHost.id}/isHost`]: true,
+            [`rooms/${roomCode}/players/${playerId}`]: null,
+          });
+        }
       }
     }
 

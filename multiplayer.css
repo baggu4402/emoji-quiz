@@ -112,7 +112,7 @@
 
 .player-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
@@ -137,6 +137,14 @@
   border-radius: 999px;
   background: var(--secondary);
   color: #713815;
+  font-size: 12px;
+}
+
+.me-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e9f7ef;
+  color: var(--success);
   font-size: 12px;
 }
 
