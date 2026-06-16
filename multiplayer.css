@@ -122,6 +122,26 @@
   text-align: center;
 }
 
+.result-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: white;
+  font-weight: 800;
+}
+
+.result-row + .result-row {
+  margin-top: 8px;
+}
+
+.rank-text {
+  color: var(--primary-dark);
+  font-weight: 900;
+}
+
 button:disabled {
   cursor: not-allowed;
   filter: grayscale(0.3);
