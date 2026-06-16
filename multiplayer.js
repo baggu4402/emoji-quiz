@@ -1101,18 +1101,16 @@
 
     const sixHours = 6 * 60 * 60 * 1000;
     const cutoff = Date.now() - sixHours;
-    const snapshot = await db.ref("rooms").once("value");
-    const rooms = snapshot.val() || {};
-    const updates = {};
+    const lastRoom = getLastRoomSession();
+    const roomCode = lastRoom?.roomCode || "";
 
-    Object.entries(rooms).forEach(([roomCode, room]) => {
-      if (room.createdAt && room.createdAt < cutoff) {
-        updates[`rooms/${roomCode}`] = null;
-      }
-    });
+    if (!/^[A-Z2-9]{4}$/.test(roomCode)) return;
 
-    if (Object.keys(updates).length > 0) {
-      await db.ref().update(updates);
+    const snapshot = await db.ref(`rooms/${roomCode}`).get();
+    const room = snapshot.val();
+
+    if (room?.hostId === currentPlayerId && room.createdAt && room.createdAt < cutoff) {
+      await db.ref(`rooms/${roomCode}`).remove();
     }
   }
 
@@ -1145,7 +1143,6 @@
       await cleanupOldRooms();
     } catch (error) {
       console.warn("Failed to cleanup old rooms", error);
-      setLastFirebaseError(error);
     }
 
     const roomCode = await findAvailableRoomCode();
