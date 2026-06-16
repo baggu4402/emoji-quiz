@@ -148,6 +148,78 @@ https://baggu4402.github.io/emoji-quiz/?room=ABCD
 6. 시간 초과, 다음 문제, 결과 공유를 확인한다.
 7. 문제가 있으면 게임 방법 화면의 `버그 리포트 복사` 버튼을 누르고 내용을 공유한다.
 
+## 최종 친구 테스트 체크리스트
+
+### 1. 배포 확인
+
+- GitHub Pages 링크가 정상 접속되는지 확인
+- 메인 화면이 정상 표시되는지 확인
+- 모바일 브라우저에서 화면이 깨지지 않는지 확인
+
+### 2. 싱글 플레이 확인
+
+- 랜덤 시작
+- 카테고리 선택
+- 난이도 선택
+- 정답 제출
+- 힌트 보기
+- 정답 보기
+- 결과 공유
+
+### 3. 멀티플레이 확인
+
+- 방 만들기
+- 방 코드 복사
+- 초대 링크 복사
+- 다른 브라우저/시크릿 창에서 방 참가
+- 방장만 카테고리/난이도 변경 가능
+- 방장만 게임 시작 가능
+- 모든 참가자에게 같은 문제 표시
+- 먼저 맞힌 사람만 점수 획득
+- 시간 초과 후 정답 공개
+- 방장만 다음 문제 가능
+- 최종 순위 표시
+- 결과 공유
+
+### 4. 안정성 확인
+
+- 새로고침 후 이전 방 복귀
+- 방장 나가기 후 방장 이양
+- 비방장 나가기
+- 게임 중 재접속
+- 모바일에서 입력창/버튼 동작 확인
+
+### 5. 오류 발생 시 확인 순서
+
+1. 오른쪽 아래 상태 패널을 연다.
+2. Firebase가 connected인지 확인한다.
+3. Auth가 signed in인지 확인한다.
+4. Last Error에 PERMISSION_DENIED가 있는지 확인한다.
+5. Anonymous Auth가 켜져 있는지 확인한다.
+6. Realtime Database Rules가 최신인지 확인한다.
+7. 브라우저 캐시 또는 Service Worker를 삭제하고 새로고침한다.
+8. 버그 리포트 복사 버튼으로 내용을 공유한다.
+
+## Firebase 설정 확인
+
+멀티플레이 테스트 전 Firebase Console에서 아래 항목을 확인한다.
+
+### Authentication
+
+- Build > Authentication > Sign-in method
+- Anonymous 제공자가 Enabled 상태인지 확인
+
+### Realtime Database
+
+- Build > Realtime Database > Rules
+- database.rules.json 내용이 적용되어 있는지 확인
+
+### 데이터 확인
+
+- 방을 만들면 rooms/{roomCode} 데이터가 생성되어야 함
+- players 아래에 auth.uid 기반 player 데이터가 생성되어야 함
+- 게임 시작 시 status가 playing으로 바뀌어야 함
+
 ## 버그 리포트에 포함되는 정보
 
 - 현재 URL
@@ -156,6 +228,21 @@ https://baggu4402.github.io/emoji-quiz/?room=ABCD
 - 멀티플레이 상태
 - Firebase/Auth 상태
 - 마지막 에러 메시지
+
+## PWA 캐시 문제 해결
+
+PWA와 Service Worker 때문에 이전 코드가 남아 보일 수 있다.
+
+Chrome 기준:
+
+1. F12 개발자도구 열기
+2. Application 탭
+3. Service Workers
+4. Unregister 클릭
+5. Storage > Clear site data 클릭
+6. 페이지 새로고침
+
+간단히는 Ctrl + F5 강력 새로고침을 먼저 시도한다.
 
 ## PWA 설치
 

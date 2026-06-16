@@ -464,6 +464,33 @@ h2 {
   text-align: center;
 }
 
+.test-helper-text {
+  padding: 12px;
+  border-radius: 16px;
+  background: #fff0d9;
+}
+
+.test-check-card {
+  margin-top: 16px;
+}
+
+.test-check-card h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.test-check-card ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.test-check-card li + li {
+  margin-top: 8px;
+}
+
 @media (max-width: 360px) {
   .app {
     padding: 18px 14px;
