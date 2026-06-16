@@ -126,7 +126,7 @@ Firebase 콘솔에서:
 
 ## 테스트용 상태 패널
 
-멀티플레이 테스트 중 화면 오른쪽 아래의 `상태` 버튼을 누르면 Firebase/Auth/Room 상태를 확인할 수 있습니다.
+멀티플레이 테스트 중 URL에 `?debug=1`을 붙이면 오른쪽 아래 `상태` 버튼으로 Firebase/Auth/Room 상태를 확인할 수 있습니다.
 
 표시 항목:
 
@@ -139,6 +139,30 @@ Firebase 콘솔에서:
 - 마지막 Firebase 오류
 
 배포 전에는 숨김 처리하거나 제거할 수 있습니다.
+
+## 디버그 모드
+
+일반 접속에서는 오른쪽 아래 상태 패널이 숨겨진다.
+
+테스트 중 Firebase/Auth/Room 상태를 확인하려면 URL 뒤에 `?debug=1`을 붙인다.
+
+예시:
+
+https://baggu4402.github.io/emoji-quiz/?debug=1
+
+방 초대 링크와 같이 쓰려면:
+
+https://baggu4402.github.io/emoji-quiz/?room=ABCD&debug=1
+
+디버그 패널에서 확인할 수 있는 정보:
+
+- Firebase 연결 상태
+- Anonymous Auth 로그인 상태
+- playerId
+- roomCode
+- 방장 여부
+- room status
+- 마지막 Firebase 에러
 
 ## 멀티플레이 재접속
 
@@ -237,7 +261,7 @@ https://baggu4402.github.io/emoji-quiz/?room=ABCD
 
 ### 5. 오류 발생 시 확인 순서
 
-1. 오른쪽 아래 상태 패널을 연다.
+1. URL에 `?debug=1`을 붙이고 오른쪽 아래 상태 패널을 연다.
 2. Firebase가 connected인지 확인한다.
 3. Auth가 signed in인지 확인한다.
 4. Last Error에 PERMISSION_DENIED가 있는지 확인한다.

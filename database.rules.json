@@ -37,6 +37,10 @@
         "createdAt": {
           ".validate": "newData.isNumber() && newData.val() > 0"
         },
+        "finishedAt": {
+          ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
+          ".validate": "!newData.exists() || (newData.isNumber() && newData.val() > 0)"
+        },
         "currentQuestionIndex": {
           ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 500"

@@ -9,6 +9,8 @@
   const HINT_REVEAL_SECONDS = 5;
   const AUTO_NEXT_DELAY_MS = 3000;
   const MAX_ROOM_PLAYERS = 6;
+  const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+  const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 
   let db = null;
   let auth = null;
@@ -114,6 +116,27 @@
 
   function setLastFirebaseError(error) {
     lastFirebaseError = error?.message || String(error || "");
+    updateDebugPanel();
+  }
+
+  function isDebugMode() {
+    const params = new URLSearchParams(window.location.search);
+    const debugValue = params.get("debug");
+    return debugValue === "1" || debugValue === "true";
+  }
+
+  function initDebugPanel() {
+    if (!debugPanel) return;
+
+    if (!isDebugMode()) {
+      debugPanel.classList.add("hidden");
+      return;
+    }
+
+    debugPanel.classList.remove("hidden");
+    debugToggleBtn?.addEventListener("click", () => {
+      debugPanel.classList.toggle("collapsed");
+    });
     updateDebugPanel();
   }
 
@@ -1099,8 +1122,9 @@
   async function cleanupOldRooms() {
     if (!db) return;
 
-    const sixHours = 6 * 60 * 60 * 1000;
-    const cutoff = Date.now() - sixHours;
+    const now = Date.now();
+    const oldRoomCutoff = now - SIX_HOURS_MS;
+    const finishedCutoff = now - THIRTY_MINUTES_MS;
     const lastRoom = getLastRoomSession();
     const roomCode = lastRoom?.roomCode || "";
 
@@ -1108,8 +1132,17 @@
 
     const snapshot = await db.ref(`rooms/${roomCode}`).get();
     const room = snapshot.val();
+    const playerCount = room?.players ? Object.keys(room.players).length : 0;
+    const shouldRemoveRoom = Boolean(
+      room &&
+      (
+        (room.createdAt && room.createdAt < oldRoomCutoff) ||
+        (room.status === "finished" && room.finishedAt && room.finishedAt < finishedCutoff) ||
+        playerCount === 0
+      )
+    );
 
-    if (room?.hostId === currentPlayerId && room.createdAt && room.createdAt < cutoff) {
+    if (room?.hostId === currentPlayerId && shouldRemoveRoom) {
       await db.ref(`rooms/${roomCode}`).remove();
     }
   }
@@ -1472,7 +1505,10 @@
     const questionTotal = Array.isArray(room.questionIndexes) ? room.questionIndexes.length : 0;
 
     if (nextIndex >= questionTotal) {
-      await db.ref(`rooms/${currentRoomCode}`).update({ status: "finished" });
+      await db.ref(`rooms/${currentRoomCode}`).update({
+        status: "finished",
+        finishedAt: Date.now(),
+      });
       return;
     }
 
@@ -1514,12 +1550,6 @@
   };
 
   function bindEvents() {
-    if (debugToggleBtn && debugPanel) {
-      debugToggleBtn.addEventListener("click", () => {
-        debugPanel.classList.toggle("collapsed");
-      });
-    }
-
     multiplayerOpenBtn?.addEventListener("click", () => {
       if (!applyRoomCodeFromUrl(true)) {
         setMenuStatus("");
@@ -1682,7 +1712,7 @@
 
   populateCategorySelect();
   populateDifficultySelect();
-  updateDebugPanel();
+  initDebugPanel();
   if (applyRoomCodeFromUrl(true)) {
     showScreenSafe("multiplayer-menu-screen");
   }
