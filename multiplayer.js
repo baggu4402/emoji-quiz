@@ -5,6 +5,9 @@
   const authFailedMessage = "멀티플레이 인증에 실패했습니다. Firebase Anonymous Auth 설정을 확인해주세요.";
   const roundReadyMessage = "가장 먼저 맞히면 +10점";
   const ROUND_TIME_LIMIT_SECONDS = 20;
+  const DEFAULT_QUESTION_LIMIT = 10;
+  const HINT_REVEAL_SECONDS = 5;
+  const AUTO_NEXT_DELAY_MS = 2000;
   const MAX_ROOM_PLAYERS = 6;
 
   let db = null;
@@ -18,6 +21,8 @@
   let roomRef = null;
   let latestRoom = null;
   let multiTimerId = null;
+  let autoNextTimerId = null;
+  let scheduledAutoNextRoundKey = "";
   let lastResultPlayers = {};
   let lastFirebaseError = "";
   let lastRoomStatus = "-";
@@ -44,6 +49,8 @@
   const multiMenuStatus = document.querySelector("#multi-menu-status");
   const multiCategorySelect = document.querySelector("#multi-category-select");
   const multiDifficultySelect = document.querySelector("#multi-difficulty-select");
+  const multiQuestionLimitSelect = document.querySelector("#multi-question-limit-select");
+  const multiTimeLimitSelect = document.querySelector("#multi-time-limit-select");
   const multiRoomLabel = document.querySelector("#multi-room-label");
   const multiDifficultyLabel = document.querySelector("#multi-difficulty-label");
   const multiQuestionCount = document.querySelector("#multi-question-count");
@@ -53,10 +60,12 @@
   const multiEmojiText = document.querySelector("#multi-emoji-text");
   const multiCorrectBurst = document.querySelector("#multi-correct-burst");
   const multiRoundStatus = document.querySelector("#multi-round-status");
+  const multiHintText = document.querySelector("#multi-hint-text");
   const multiAnswerInput = document.querySelector("#multi-answer-input");
   const multiSubmitBtn = document.querySelector("#multi-submit-btn");
   const multiNextBtn = document.querySelector("#multi-next-btn");
   const multiScoreboard = document.querySelector("#multi-scoreboard");
+  const multiWrongAnswerList = document.querySelector("#multi-wrong-answer-list");
   const multiResultList = document.querySelector("#multi-result-list");
   const multiResultStatus = document.querySelector("#multi-result-status");
   const multiResultHomeBtn = document.querySelector("#multi-result-home-btn");
@@ -524,11 +533,48 @@
     return multiDifficultySelect?.value || "all";
   }
 
-  function getQuestionLimit() {
-    return typeof QUESTION_LIMIT === "number" ? QUESTION_LIMIT : 10;
+  function clampNumber(value, fallback, min, max) {
+    const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue)) return fallback;
+
+    return Math.min(max, Math.max(min, Math.trunc(numberValue)));
   }
 
-  function getMultiplayerQuestionIndexes(categoryId, difficultyId = "all") {
+  function getSelectedQuestionLimit() {
+    return clampNumber(multiQuestionLimitSelect?.value, DEFAULT_QUESTION_LIMIT, 1, 30);
+  }
+
+  function getSelectedTimeLimitSeconds() {
+    return clampNumber(multiTimeLimitSelect?.value, ROUND_TIME_LIMIT_SECONDS, 5, 120);
+  }
+
+  function getQuestionLimit(room = latestRoom) {
+    return clampNumber(room?.questionLimit, DEFAULT_QUESTION_LIMIT, 1, 30);
+  }
+
+  function getRoundTimeLimitSeconds(room = latestRoom) {
+    return clampNumber(room?.timeLimitSeconds, ROUND_TIME_LIMIT_SECONDS, 5, 120);
+  }
+
+  function createRoundState(index, timeLimitSeconds) {
+    return {
+      index,
+      winnerId: null,
+      winnerName: null,
+      answer: null,
+      answeredAt: null,
+      startedAt: Date.now(),
+      timeLimitSeconds: clampNumber(timeLimitSeconds, ROUND_TIME_LIMIT_SECONDS, 5, 120),
+      isTimeOver: false,
+      hintShown: false,
+      hintShownAt: null,
+      pointsAwarded: 0,
+      wrongAnswers: {},
+    };
+  }
+
+  function getMultiplayerQuestionIndexes(categoryId, difficultyId = "all", limit = DEFAULT_QUESTION_LIMIT) {
     if (!Array.isArray(quizData)) return [];
 
     let source = categoryId === "random" && typeof getEnabledCategoryIds === "function"
@@ -547,7 +593,7 @@
       source = source.filter((index) => quizData[index]?.difficulty === difficultyId);
     }
 
-    return shuffleValues(source).slice(0, getQuestionLimit());
+    return shuffleValues(source).slice(0, clampNumber(limit, DEFAULT_QUESTION_LIMIT, 1, 30));
   }
 
   function getPlayerRecord(host) {
@@ -584,6 +630,7 @@
 
   function clearRoomSubscription() {
     stopMultiplayerTimer();
+    clearAutoNextTimer();
 
     if (roomRef) {
       roomRef.off("value");
@@ -632,6 +679,26 @@
     `).join("");
   }
 
+  function renderWrongAnswers(wrongAnswers = {}) {
+    if (!multiWrongAnswerList) return;
+
+    const entries = Object.values(wrongAnswers || {})
+      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+      .slice(-8);
+
+    if (!entries.length) {
+      multiWrongAnswerList.innerHTML = `<p class="empty-player">아직 오답이 없습니다.</p>`;
+      return;
+    }
+
+    multiWrongAnswerList.innerHTML = entries.map((entry) => `
+      <div class="wrong-answer-row ${entry.playerId === currentPlayerId ? "is-me" : ""}">
+        <span class="wrong-answer-name">${escapeHtml(entry.playerName || "플레이어")}${entry.playerId === currentPlayerId ? " · 나" : ""}</span>
+        <span class="wrong-answer-text">${escapeHtml(entry.answer || "")}</span>
+      </div>
+    `).join("");
+  }
+
   function renderMultiplayerResult(players = {}) {
     if (!multiResultList) return;
 
@@ -663,6 +730,14 @@
       multiDifficultySelect.disabled = !isHost || room?.status !== "waiting";
     }
 
+    if (multiQuestionLimitSelect) {
+      multiQuestionLimitSelect.disabled = !isHost || room?.status !== "waiting";
+    }
+
+    if (multiTimeLimitSelect) {
+      multiTimeLimitSelect.disabled = !isHost || room?.status !== "waiting";
+    }
+
     if (!startRoomGameBtn) return;
 
     startRoomGameBtn.disabled = !isHost;
@@ -680,6 +755,14 @@
 
     if (multiDifficultySelect) {
       multiDifficultySelect.value = room?.difficulty || "all";
+    }
+
+    if (multiQuestionLimitSelect) {
+      multiQuestionLimitSelect.value = String(getQuestionLimit(room));
+    }
+
+    if (multiTimeLimitSelect) {
+      multiTimeLimitSelect.value = String(getRoundTimeLimitSeconds(room));
     }
 
     updateHostControls(room);
@@ -720,6 +803,43 @@
     }
   }
 
+  function clearAutoNextTimer() {
+    if (autoNextTimerId) {
+      clearTimeout(autoNextTimerId);
+      autoNextTimerId = null;
+    }
+
+    scheduledAutoNextRoundKey = "";
+  }
+
+  function getRoundKey(room) {
+    const round = room?.currentRound || {};
+    return `${currentRoomCode || room?.code || ""}_${round.index ?? room?.currentQuestionIndex ?? 0}_${round.startedAt || ""}`;
+  }
+
+  function scheduleAutoNextRound(room) {
+    const currentRound = room?.currentRound || {};
+    const roundEnded = Boolean(currentRound.winnerId || currentRound.isTimeOver);
+
+    if (!isHost || room?.status !== "playing" || !roundEnded) return;
+
+    const roundKey = getRoundKey(room);
+    if (scheduledAutoNextRoundKey === roundKey) return;
+
+    clearAutoNextTimer();
+    scheduledAutoNextRoundKey = roundKey;
+    autoNextTimerId = setTimeout(() => {
+      autoNextTimerId = null;
+      goNextMultiplayerQuestion().catch((error) => {
+        setLastFirebaseError(error);
+        if (multiRoundStatus) {
+          multiRoundStatus.textContent = "다음 문제로 이동할 수 없습니다. 잠시 후 다시 시도해주세요.";
+          multiRoundStatus.className = "feedback-text wrong";
+        }
+      });
+    }, AUTO_NEXT_DELAY_MS);
+  }
+
   async function markCurrentRoundTimeOver(room) {
     if (!isHost || !currentRoomCode || !db) return;
 
@@ -736,6 +856,23 @@
         isTimeOver: true,
         answer: question.answers[0],
         answeredAt: Date.now(),
+        pointsAwarded: 0,
+      };
+    });
+  }
+
+  async function revealRoundHint(room) {
+    if (!isHost || !currentRoomCode || !db) return;
+
+    await db.ref(`rooms/${currentRoomCode}/currentRound`).transaction((currentRound) => {
+      if (!currentRound || currentRound.winnerId || currentRound.isTimeOver || currentRound.hintShown) {
+        return currentRound;
+      }
+
+      return {
+        ...currentRound,
+        hintShown: true,
+        hintShownAt: Date.now(),
       };
     });
   }
@@ -753,6 +890,10 @@
     const tick = () => {
       const remainingSeconds = getRemainingSeconds(currentRound);
       renderTimerText(remainingSeconds);
+
+      if (isHost && remainingSeconds <= HINT_REVEAL_SECONDS && !currentRound.hintShown) {
+        revealRoundHint(room).catch(setLastFirebaseError);
+      }
 
       if (remainingSeconds <= 0) {
         stopMultiplayerTimer();
@@ -790,11 +931,14 @@
     const currentIndex = room?.currentQuestionIndex || 0;
     const questionTotal = Array.isArray(room?.questionIndexes)
       ? room.questionIndexes.length
-      : getQuestionLimit();
+      : getQuestionLimit(room);
     const currentRound = room?.currentRound || {};
     const hasWinner = Boolean(currentRound.winnerId);
     const isTimeOver = Boolean(currentRound.isTimeOver);
     const roundEnded = hasWinner || isTimeOver;
+    const autoAdvanceText = currentIndex >= questionTotal - 1
+      ? "2초 후 결과로 넘어갑니다."
+      : "2초 후 다음 문제로 넘어갑니다.";
     const actualCategoryName = typeof getCategoryName === "function"
       ? getCategoryName(question?.category)
       : question?.category || "랜덤";
@@ -818,6 +962,18 @@
     setText(multiMyScore, me.score || 0);
     setText(multiEmojiText, question?.emoji || "🎮");
     renderMultiplayerScoreboard(players);
+    renderWrongAnswers(currentRound.wrongAnswers || {});
+
+    if (multiHintText) {
+      const hintText = question?.hint || "";
+      if (currentRound.hintShown && hintText) {
+        multiHintText.textContent = `힌트: ${hintText}`;
+        multiHintText.classList.remove("hidden");
+      } else {
+        multiHintText.textContent = "";
+        multiHintText.classList.add("hidden");
+      }
+    }
 
     if (multiAnswerInput) {
       multiAnswerInput.disabled = roundEnded;
@@ -829,13 +985,17 @@
 
     if (multiRoundStatus) {
       if (hasWinner) {
-        multiRoundStatus.textContent = `${currentRound.winnerName || "누군가"}님이 먼저 맞혔습니다! 정답: ${currentRound.answer || ""}`;
+        const pointsAwarded = currentRound.pointsAwarded || (currentRound.hintShown ? 5 : 10);
+        const winnerMessage = currentRound.hintShown
+          ? `${currentRound.winnerName || "누군가"}님이 힌트 후 맞혔습니다! +5점`
+          : `${currentRound.winnerName || "누군가"}님이 먼저 맞혔습니다! +${pointsAwarded}점`;
+        multiRoundStatus.textContent = `${winnerMessage} 정답: ${currentRound.answer || ""} · ${autoAdvanceText}`;
         multiRoundStatus.className = "feedback-text correct";
       } else if (isTimeOver) {
-        multiRoundStatus.textContent = `시간 초과! 정답: ${currentRound.answer || question?.answers?.[0] || ""}`;
+        multiRoundStatus.textContent = `시간 초과! 정답: ${currentRound.answer || question?.answers?.[0] || ""} · ${autoAdvanceText}`;
         multiRoundStatus.className = "feedback-text wrong";
       } else {
-        multiRoundStatus.textContent = roundReadyMessage;
+        multiRoundStatus.textContent = currentRound.hintShown ? "힌트 공개 후 맞히면 +5점" : roundReadyMessage;
         multiRoundStatus.className = "feedback-text";
       }
     }
@@ -847,14 +1007,16 @@
     if (multiNextBtn) {
       const isLastQuestion = currentIndex >= questionTotal - 1;
       multiNextBtn.textContent = isLastQuestion ? "결과 보기" : "다음 문제";
-      multiNextBtn.classList.toggle("hidden", !isHost || !roundEnded);
-      multiNextBtn.disabled = !isHost || !roundEnded;
+      multiNextBtn.classList.add("hidden");
+      multiNextBtn.disabled = true;
     }
 
     if (roundEnded) {
       stopMultiplayerTimer();
       renderTimerText(isTimeOver ? 0 : getRemainingSeconds(currentRound));
+      scheduleAutoNextRound(room);
     } else {
+      clearAutoNextTimer();
       startMultiplayerTimer(room);
     }
   }
@@ -885,6 +1047,7 @@
 
     if (room.status === "waiting") {
       stopMultiplayerTimer();
+      clearAutoNextTimer();
       showScreenSafe("room-screen");
       return;
     }
@@ -897,6 +1060,7 @@
 
     if (room.status === "finished") {
       stopMultiplayerTimer();
+      clearAutoNextTimer();
       showScreenSafe("multi-result-screen");
       renderMultiplayerResult(room.players || {});
     }
@@ -990,12 +1154,16 @@
     const now = Date.now();
     const category = getSelectedCategory();
     const difficulty = getSelectedDifficulty();
+    const questionLimit = getSelectedQuestionLimit();
+    const timeLimitSeconds = getSelectedTimeLimitSeconds();
     const roomData = {
       code: roomCode,
       status: "waiting",
       hostId: currentPlayerId,
       category,
       difficulty,
+      questionLimit,
+      timeLimitSeconds,
       currentQuestionIndex: 0,
       createdAt: now,
       players: {
@@ -1174,6 +1342,18 @@
     await roomRef.update({ difficulty: getSelectedDifficulty() });
   }
 
+  async function updateRoomQuestionLimit() {
+    if (!roomRef || !isHost || latestRoom?.status !== "waiting") return;
+
+    await roomRef.update({ questionLimit: getSelectedQuestionLimit() });
+  }
+
+  async function updateRoomTimeLimit() {
+    if (!roomRef || !isHost || latestRoom?.status !== "waiting") return;
+
+    await roomRef.update({ timeLimitSeconds: getSelectedTimeLimitSeconds() });
+  }
+
   async function startRoomGame() {
     if (!isHost || !currentRoomCode) return;
 
@@ -1184,7 +1364,9 @@
 
     const category = getSelectedCategory();
     const difficulty = getSelectedDifficulty();
-    const questionIndexes = getMultiplayerQuestionIndexes(category, difficulty);
+    const questionLimit = getSelectedQuestionLimit();
+    const timeLimitSeconds = getSelectedTimeLimitSeconds();
+    const questionIndexes = getMultiplayerQuestionIndexes(category, difficulty, questionLimit);
 
     if (!questionIndexes.length) {
       setRoomStatus("선택한 조건에 맞는 문제가 없습니다.");
@@ -1195,18 +1377,28 @@
       status: "playing",
       category,
       difficulty,
+      questionLimit,
+      timeLimitSeconds,
       questionIndexes,
       currentQuestionIndex: 0,
-      currentRound: {
-        index: 0,
-        winnerId: null,
-        winnerName: null,
-        answer: null,
-        answeredAt: null,
-        startedAt: Date.now(),
-        timeLimitSeconds: ROUND_TIME_LIMIT_SECONDS,
-        isTimeOver: false,
-      },
+      currentRound: createRoundState(0, timeLimitSeconds),
+    });
+  }
+
+  async function saveWrongAnswer(answerText) {
+    if (!currentRoomCode || !db || !answerText) return;
+
+    const currentRoundSnapshot = await db.ref(`rooms/${currentRoomCode}/currentRound`).get();
+    const currentRound = currentRoundSnapshot.val();
+
+    if (!currentRound || currentRound.winnerId || currentRound.isTimeOver) return;
+    if (getRemainingSeconds(currentRound) <= 0) return;
+
+    await db.ref(`rooms/${currentRoomCode}/currentRound/wrongAnswers`).push({
+      playerId: currentPlayerId,
+      playerName: currentPlayerName,
+      answer: answerText.slice(0, 30),
+      createdAt: Date.now(),
     });
   }
 
@@ -1221,7 +1413,8 @@
     if (getRemainingSeconds(room.currentRound) <= 0) return;
 
     const question = getCurrentQuestion(room);
-    const userAnswer = normalizeMultiplayerAnswer(multiAnswerInput.value.trim());
+    const originalAnswer = multiAnswerInput.value.trim();
+    const userAnswer = normalizeMultiplayerAnswer(originalAnswer);
 
     if (!question || !userAnswer) return;
 
@@ -1230,20 +1423,24 @@
     ));
 
     if (!isCorrect) {
+      await saveWrongAnswer(originalAnswer);
       if (multiRoundStatus) {
         multiRoundStatus.textContent = "오답입니다. 다시 시도하세요.";
         multiRoundStatus.className = "feedback-text wrong";
       }
       playMultiplayerWrongFeedback();
-      multiAnswerInput.select();
+      multiAnswerInput.value = "";
+      multiAnswerInput.focus();
       return;
     }
 
     const roundRef = db.ref(`rooms/${currentRoomCode}/currentRound`);
     const transactionResult = await roundRef.transaction((currentRound) => {
-      if (!currentRound || currentRound.winnerId || currentRound.isTimeOver) {
+      if (!currentRound || currentRound.winnerId || currentRound.isTimeOver || getRemainingSeconds(currentRound) <= 0) {
         return currentRound;
       }
+
+      const pointsAwarded = currentRound.hintShown ? 5 : 10;
 
       return {
         ...currentRound,
@@ -1251,6 +1448,7 @@
         winnerName: currentPlayerName,
         answer: question.answers[0],
         answeredAt: Date.now(),
+        pointsAwarded,
       };
     });
 
@@ -1258,9 +1456,10 @@
     const isWinner = transactionResult.committed && updatedRound?.winnerId === currentPlayerId;
 
     if (isWinner) {
+      const earnedScore = updatedRound?.pointsAwarded || (updatedRound?.hintShown ? 5 : 10);
       playMultiplayerCorrectFeedback(room, updatedRound);
       await db.ref(`rooms/${currentRoomCode}/players/${currentPlayerId}/score`).transaction((score) => (
-        (score || 0) + 10
+        (score || 0) + earnedScore
       ));
     }
   }
@@ -1268,6 +1467,7 @@
   async function goNextMultiplayerQuestion() {
     if (!isHost || !currentRoomCode || !db) return;
 
+    clearAutoNextTimer();
     const roomSnapshot = await db.ref(`rooms/${currentRoomCode}`).get();
     const room = roomSnapshot.val();
 
@@ -1283,16 +1483,7 @@
 
     await db.ref(`rooms/${currentRoomCode}`).update({
       currentQuestionIndex: nextIndex,
-      currentRound: {
-        index: nextIndex,
-        winnerId: null,
-        winnerName: null,
-        answer: null,
-        answeredAt: null,
-        startedAt: Date.now(),
-        timeLimitSeconds: ROUND_TIME_LIMIT_SECONDS,
-        isTimeOver: false,
-      },
+      currentRound: createRoundState(nextIndex, getRoundTimeLimitSeconds(room)),
     });
   }
 
@@ -1476,6 +1667,20 @@
       updateRoomDifficulty().catch((error) => {
         setLastFirebaseError(error);
         setRoomStatus("난이도를 변경할 수 없습니다. 잠시 후 다시 시도해주세요.");
+      });
+    });
+
+    multiQuestionLimitSelect?.addEventListener("change", () => {
+      updateRoomQuestionLimit().catch((error) => {
+        setLastFirebaseError(error);
+        setRoomStatus("문제 수를 변경할 수 없습니다. 잠시 후 다시 시도해주세요.");
+      });
+    });
+
+    multiTimeLimitSelect?.addEventListener("change", () => {
+      updateRoomTimeLimit().catch((error) => {
+        setLastFirebaseError(error);
+        setRoomStatus("제한시간을 변경할 수 없습니다. 잠시 후 다시 시도해주세요.");
       });
     });
   }

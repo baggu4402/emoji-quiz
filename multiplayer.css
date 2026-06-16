@@ -108,13 +108,28 @@
   color: var(--danger);
 }
 
+#multi-quiz-screen .hint-text {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fff4cf;
+  color: #7a4b00;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
 .player-panel,
+.wrong-feed,
 .scoreboard,
 .leaderboard {
   margin-top: 16px;
   padding: 16px;
   border-radius: 20px;
   background: #fff8ef;
+}
+
+.wrong-feed {
+  border: 1px solid var(--line);
 }
 
 .scoreboard {
@@ -133,6 +148,44 @@
   display: grid;
   gap: 8px;
   margin-top: 12px;
+}
+
+.wrong-answer-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.wrong-answer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: white;
+  font-weight: 800;
+}
+
+.wrong-answer-row.is-me {
+  outline: 2px solid rgba(55, 164, 102, 0.25);
+}
+
+.wrong-answer-name {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wrong-answer-text {
+  min-width: 0;
+  color: var(--danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .player-row {
@@ -296,5 +349,10 @@ button:disabled {
 
   .result-row strong {
     grid-column: 2;
+  }
+
+  .wrong-answer-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }

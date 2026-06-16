@@ -26,6 +26,14 @@
           ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
           ".validate": "newData.isString() && (newData.val() === 'all' || newData.val() === 'easy' || newData.val() === 'normal' || newData.val() === 'hard')"
         },
+        "questionLimit": {
+          ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 30"
+        },
+        "timeLimitSeconds": {
+          ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
+          ".validate": "newData.isNumber() && newData.val() >= 5 && newData.val() <= 120"
+        },
         "createdAt": {
           ".validate": "newData.isNumber() && newData.val() > 0"
         },
@@ -65,6 +73,32 @@
           },
           "isTimeOver": {
             ".validate": "newData.isBoolean()"
+          },
+          "hintShown": {
+            ".validate": "newData.isBoolean()"
+          },
+          "hintShownAt": {
+            ".validate": "!newData.exists() || (newData.isNumber() && newData.val() > 0)"
+          },
+          "pointsAwarded": {
+            ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 5 || newData.val() === 10)"
+          },
+          "wrongAnswers": {
+            "$wrongAnswerId": {
+              ".validate": "!newData.exists() || newData.hasChildren(['playerId', 'playerName', 'answer', 'createdAt'])",
+              "playerId": {
+                ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 128"
+              },
+              "playerName": {
+                ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 10"
+              },
+              "answer": {
+                ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
+              },
+              "createdAt": {
+                ".validate": "newData.isNumber() && newData.val() > 0"
+              }
+            }
           }
         },
         "players": {

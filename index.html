@@ -150,6 +150,23 @@
         <label class="field-label" for="multi-difficulty-select">문제 난이도</label>
         <select id="multi-difficulty-select" class="select-input"></select>
 
+        <label class="field-label" for="multi-question-limit-select">문제 수</label>
+        <select id="multi-question-limit-select" class="select-input">
+          <option value="5">5문제</option>
+          <option value="10" selected>10문제</option>
+          <option value="15">15문제</option>
+          <option value="20">20문제</option>
+        </select>
+
+        <label class="field-label" for="multi-time-limit-select">문제 시간</label>
+        <select id="multi-time-limit-select" class="select-input">
+          <option value="10">10초</option>
+          <option value="15">15초</option>
+          <option value="20" selected>20초</option>
+          <option value="30">30초</option>
+          <option value="45">45초</option>
+        </select>
+
         <div class="player-panel">
           <div class="panel-title-row">
             <h3>참가자</h3>
@@ -183,8 +200,17 @@
         <div id="multi-emoji-text" class="emoji-text">🎮</div>
         <div id="multi-correct-burst" class="correct-burst hidden">✨ 성공! ✨</div>
         <p id="multi-round-status" class="feedback-text"></p>
+        <p id="multi-hint-text" class="hint-text hidden"></p>
         <input id="multi-answer-input" class="answer-input" type="text" autocomplete="off" placeholder="빠르게 정답 입력" />
       </article>
+
+      <div class="wrong-feed">
+        <div class="panel-title-row">
+          <h3>오답 로그</h3>
+          <span>실시간</span>
+        </div>
+        <div id="multi-wrong-answer-list" class="wrong-answer-list"></div>
+      </div>
 
       <div id="multi-scoreboard" class="scoreboard"></div>
 
