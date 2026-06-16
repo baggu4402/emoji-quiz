@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>이게 뭔데? Emoji Quiz</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <section id="home-screen" class="screen active">
+      <div class="hero-card">
+        <p class="eyebrow">Emoji Quiz</p>
+        <h1>이게 뭔데?</h1>
+        <p class="subtitle">이모지 조합을 보고 정답을 맞혀보세요.</p>
+        <div class="score-badge">최고 점수 <strong id="home-best-score">0</strong>점</div>
+      </div>
+
+      <div class="button-group">
+        <button id="quick-start-btn" class="primary-btn">랜덤으로 시작</button>
+        <button id="category-open-btn" class="secondary-btn">카테고리 선택</button>
+        <button id="how-to-btn" class="ghost-btn">게임 방법</button>
+      </div>
+    </section>
+
+    <section id="category-screen" class="screen">
+      <header class="top-bar">
+        <button class="back-btn" data-target="home-screen">←</button>
+        <h2>카테고리 선택</h2>
+      </header>
+      <div id="category-list" class="category-grid"></div>
+    </section>
+
+    <section id="quiz-screen" class="screen">
+      <header class="quiz-header">
+        <div>
+          <p id="category-label" class="small-label">랜덤</p>
+          <h2 id="question-count">문제 1 / 10</h2>
+        </div>
+        <div class="score-box">
+          <span>점수</span>
+          <strong id="score-text">0</strong>
+        </div>
+      </header>
+
+      <article class="quiz-card">
+        <div id="emoji-text" class="emoji-text">🕷️👨</div>
+        <p id="feedback-text" class="feedback-text"></p>
+        <p id="hint-text" class="hint-text hidden"></p>
+        <input id="answer-input" class="answer-input" type="text" autocomplete="off" placeholder="정답 입력" />
+      </article>
+
+      <div class="quiz-actions">
+        <button id="submit-btn" class="primary-btn">제출</button>
+        <button id="hint-btn" class="secondary-btn">힌트 보기</button>
+        <button id="show-answer-btn" class="ghost-btn">정답 보기</button>
+        <button id="next-btn" class="primary-btn hidden">다음 문제</button>
+      </div>
+    </section>
+
+    <section id="result-screen" class="screen">
+      <div class="result-card">
+        <p class="eyebrow">Game Over</p>
+        <h2>게임 종료!</h2>
+        <div class="result-score"><strong id="final-score">0</strong>점</div>
+        <p id="best-message" class="best-message"></p>
+        <div class="result-stats">
+          <div><span>맞힌 문제</span><strong id="correct-count">0</strong></div>
+          <div><span>틀린 문제</span><strong id="wrong-count">0</strong></div>
+        </div>
+      </div>
+      <div class="button-group">
+        <button id="retry-btn" class="primary-btn">다시하기</button>
+        <button id="home-btn" class="secondary-btn">메인으로</button>
+      </div>
+    </section>
+
+    <section id="how-to-screen" class="screen">
+      <header class="top-bar">
+        <button class="back-btn" data-target="home-screen">←</button>
+        <h2>게임 방법</h2>
+      </header>
+      <div class="info-card">
+        <p>1. 이모지 조합을 보고 정답을 입력합니다.</p>
+        <p>2. 힌트 없이 맞히면 10점, 힌트 사용 후 맞히면 5점입니다.</p>
+        <p>3. 정답 보기를 누르면 해당 문제는 0점 처리됩니다.</p>
+        <p>4. 총 10문제를 풀고 최종 점수를 확인합니다.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
