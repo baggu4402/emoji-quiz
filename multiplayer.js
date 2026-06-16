@@ -13,6 +13,7 @@
   let roomRef = null;
   let latestRoom = null;
   let multiTimerId = null;
+  let lastResultPlayers = {};
 
   const multiplayerOpenBtn = document.querySelector("#multiplayer-open-btn");
   const createRoomBtn = document.querySelector("#create-room-btn");
@@ -41,7 +42,9 @@
   const multiNextBtn = document.querySelector("#multi-next-btn");
   const multiScoreboard = document.querySelector("#multi-scoreboard");
   const multiResultList = document.querySelector("#multi-result-list");
+  const multiResultStatus = document.querySelector("#multi-result-status");
   const multiResultHomeBtn = document.querySelector("#multi-result-home-btn");
+  const shareMultiResultBtn = document.querySelector("#share-multi-result-btn");
 
   function isFirebaseReady() {
     return Boolean(
@@ -205,17 +208,48 @@
     }
   }
 
+  async function writeTextToClipboard(text) {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    if (!copyTextWithFallback(text)) {
+      throw new Error("Fallback copy failed");
+    }
+  }
+
   async function copyTextToClipboard(text, successMessage) {
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else if (!copyTextWithFallback(text)) {
-        throw new Error("Fallback copy failed");
-      }
-
+      await writeTextToClipboard(text);
       setRoomStatus(successMessage, "success");
     } catch (error) {
       setRoomStatus("복사에 실패했습니다. 직접 선택해서 복사해주세요.", "error");
+    }
+  }
+
+  function getMultiplayerShareText(players) {
+    const sortedPlayers = getSortedPlayers(players);
+    const rankingLines = sortedPlayers.map((player, index) => (
+      `${index + 1}위 ${player.name || "플레이어"} ${player.score || 0}점`
+    ));
+
+    return [
+      "이게 뭔데? Emoji Quiz 멀티 결과",
+      "",
+      ...rankingLines,
+      "",
+      "친구랑 같이하기:",
+      window.location.origin + window.location.pathname,
+    ].join("\n");
+  }
+
+  async function shareMultiplayerResult() {
+    try {
+      await writeTextToClipboard(getMultiplayerShareText(lastResultPlayers));
+      setStatusMessage(multiResultStatus, "결과가 복사되었습니다.", "success");
+    } catch (error) {
+      setStatusMessage(multiResultStatus, "복사에 실패했습니다. 직접 선택해서 복사해주세요.", "error");
     }
   }
 
@@ -325,6 +359,7 @@
   function renderMultiplayerResult(players = {}) {
     if (!multiResultList) return;
 
+    lastResultPlayers = players;
     const playerEntries = getSortedPlayers(players);
 
     if (!playerEntries.length) {
@@ -333,12 +368,14 @@
     }
 
     multiResultList.innerHTML = playerEntries.map((player, index) => `
-      <div class="result-row">
+      <div class="result-row ${index === 0 ? "top-rank" : ""}">
         <span class="rank-text">${index + 1}위</span>
         <span class="player-name">${escapeHtml(player.name || "플레이어")}</span>
         <strong>${player.score || 0}점</strong>
       </div>
     `).join("");
+
+    setStatusMessage(multiResultStatus, "");
   }
 
   function updateHostControls(room = latestRoom) {
@@ -942,6 +979,8 @@
         showScreenSafe("home-screen");
       });
     });
+
+    shareMultiResultBtn?.addEventListener("click", shareMultiplayerResult);
 
     startRoomGameBtn?.addEventListener("click", () => {
       startRoomGame().catch(() => {

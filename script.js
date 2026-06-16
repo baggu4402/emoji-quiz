@@ -92,6 +92,7 @@ const hintBtn = document.querySelector("#hint-btn");
 const showAnswerBtn = document.querySelector("#show-answer-btn");
 const nextBtn = document.querySelector("#next-btn");
 const soloBackBtn = document.querySelector("#solo-back-btn");
+const shareSoloResultBtn = document.querySelector("#share-solo-result-btn");
 const finalScore = document.querySelector("#final-score");
 const bestMessage = document.querySelector("#best-message");
 const correctCountText = document.querySelector("#correct-count");
@@ -100,6 +101,54 @@ const wrongCountText = document.querySelector("#wrong-count");
 function showScreen(screenId) {
   screens.forEach((screen) => screen.classList.remove("active"));
   document.querySelector(`#${screenId}`).classList.add("active");
+}
+
+function copyTextWithFallback(text) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  try {
+    return document.execCommand("copy");
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
+async function copyTextToClipboardForSolo(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  if (!copyTextWithFallback(text)) {
+    throw new Error("Fallback copy failed");
+  }
+}
+
+function getSoloShareText() {
+  return [
+    "이게 뭔데? Emoji Quiz",
+    `내 점수: ${score}점`,
+    `맞힌 문제: ${correctCount}개`,
+    `틀린 문제: ${wrongCount}개`,
+    "",
+    "너도 풀어보기:",
+    window.location.origin + window.location.pathname,
+  ].join("\n");
+}
+
+async function shareSoloResult() {
+  try {
+    await copyTextToClipboardForSolo(getSoloShareText());
+    bestMessage.textContent = "결과가 복사되었습니다.";
+  } catch (error) {
+    bestMessage.textContent = "복사에 실패했습니다. 직접 선택해서 복사해주세요.";
+  }
 }
 
 function getBestScore() {
@@ -279,6 +328,7 @@ function bindEvents() {
   document.querySelector("#how-to-btn").addEventListener("click", () => showScreen("how-to-screen"));
   document.querySelector("#retry-btn").addEventListener("click", () => startGame(selectedCategory));
   document.querySelector("#home-btn").addEventListener("click", () => showScreen("home-screen"));
+  shareSoloResultBtn?.addEventListener("click", shareSoloResult);
   if (soloBackBtn) {
     soloBackBtn.addEventListener("click", () => showScreen(previousSoloScreen || "home-screen"));
   }

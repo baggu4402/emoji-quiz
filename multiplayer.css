@@ -57,10 +57,11 @@
 .room-code {
   margin: 12px 0;
   color: var(--primary-dark);
-  font-size: 42px;
+  font-size: clamp(32px, 12vw, 42px);
   font-weight: 900;
   text-align: center;
   letter-spacing: 0.12em;
+  overflow-wrap: anywhere;
 }
 
 .room-share-actions {
@@ -80,7 +81,7 @@
 .timer-text {
   margin: 8px 0 0;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 900;
 }
 
@@ -95,6 +96,11 @@
   padding: 16px;
   border-radius: 20px;
   background: #fff8ef;
+}
+
+.scoreboard {
+  max-height: 220px;
+  overflow-y: auto;
 }
 
 .panel-title-row {
@@ -138,6 +144,7 @@
   background: var(--secondary);
   color: #713815;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .me-badge {
@@ -146,6 +153,7 @@
   background: #e9f7ef;
   color: var(--success);
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .empty-player {
@@ -164,6 +172,11 @@
   border-radius: 14px;
   background: white;
   font-weight: 800;
+}
+
+.result-row.top-rank {
+  border: 2px solid var(--secondary);
+  background: #fffdf8;
 }
 
 .result-row + .result-row {
@@ -192,5 +205,26 @@ button:disabled {
 @media (max-width: 360px) {
   .room-share-actions {
     grid-template-columns: 1fr;
+  }
+
+  .room-card {
+    padding: 22px 16px;
+  }
+
+  .player-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .host-badge,
+  .me-badge {
+    justify-self: start;
+  }
+
+  .result-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .result-row strong {
+    grid-column: 2;
   }
 }
