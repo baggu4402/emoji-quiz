@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>이게 뭔데? Emoji Quiz</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="multiplayer.css" />
 </head>
 <body>
   <main class="app">
@@ -18,6 +19,7 @@
 
       <div class="button-group">
         <button id="quick-start-btn" class="primary-btn">랜덤으로 시작</button>
+        <button id="multiplayer-open-btn" class="primary-btn alt-btn">친구랑 같이하기</button>
         <button id="category-open-btn" class="secondary-btn">카테고리 선택</button>
         <button id="how-to-btn" class="ghost-btn">게임 방법</button>
       </div>
@@ -75,6 +77,101 @@
       </div>
     </section>
 
+    <section id="multiplayer-menu-screen" class="screen">
+      <header class="top-bar">
+        <button class="back-btn" data-target="home-screen">←</button>
+        <h2>친구랑 같이하기</h2>
+      </header>
+      <div class="room-card">
+        <p class="eyebrow">Realtime Room</p>
+        <h2>먼저 맞히면 점수 획득</h2>
+        <p class="subtitle">방 코드를 공유해서 친구들과 같은 문제를 동시에 풀 수 있습니다.</p>
+
+        <label class="field-label" for="player-name-input">닉네임</label>
+        <input id="player-name-input" class="answer-input" type="text" maxlength="10" placeholder="예: 석현" autocomplete="off" />
+
+        <div class="button-group compact-group">
+          <button id="create-room-btn" class="primary-btn">방 만들기</button>
+        </div>
+
+        <div class="divider"><span>또는</span></div>
+
+        <label class="field-label" for="room-code-input">방 코드</label>
+        <input id="room-code-input" class="answer-input room-code-input" type="text" maxlength="6" placeholder="ABCD" autocomplete="off" />
+        <div class="button-group compact-group">
+          <button id="join-room-btn" class="secondary-btn">방 참가하기</button>
+        </div>
+
+        <p id="multi-menu-status" class="status-text"></p>
+      </div>
+    </section>
+
+    <section id="room-screen" class="screen">
+      <header class="top-bar">
+        <button id="leave-room-btn" class="back-btn">←</button>
+        <h2>대기방</h2>
+      </header>
+      <div class="room-card">
+        <p class="eyebrow">Room Code</p>
+        <div id="room-code-display" class="room-code">----</div>
+        <p class="subtitle">친구에게 이 코드를 보내주세요.</p>
+
+        <label class="field-label" for="multi-category-select">문제 카테고리</label>
+        <select id="multi-category-select" class="select-input"></select>
+
+        <div class="player-panel">
+          <div class="panel-title-row">
+            <h3>참가자</h3>
+            <span id="player-count-text">0명</span>
+          </div>
+          <div id="player-list" class="player-list"></div>
+        </div>
+
+        <p id="room-status-text" class="status-text"></p>
+        <div class="button-group compact-group">
+          <button id="start-room-game-btn" class="primary-btn">게임 시작</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="multi-quiz-screen" class="screen">
+      <header class="quiz-header">
+        <div>
+          <p id="multi-room-label" class="small-label">방 코드 ----</p>
+          <h2 id="multi-question-count">문제 1 / 10</h2>
+        </div>
+        <div class="score-box">
+          <span>내 점수</span>
+          <strong id="multi-my-score">0</strong>
+        </div>
+      </header>
+
+      <article class="quiz-card">
+        <div id="multi-emoji-text" class="emoji-text">🎮</div>
+        <p id="multi-round-status" class="feedback-text"></p>
+        <input id="multi-answer-input" class="answer-input" type="text" autocomplete="off" placeholder="빠르게 정답 입력" />
+      </article>
+
+      <div id="multi-scoreboard" class="scoreboard"></div>
+
+      <div class="quiz-actions">
+        <button id="multi-submit-btn" class="primary-btn">정답 제출</button>
+        <button id="multi-next-btn" class="secondary-btn hidden">다음 문제</button>
+        <button id="multi-leave-btn" class="ghost-btn">방 나가기</button>
+      </div>
+    </section>
+
+    <section id="multi-result-screen" class="screen">
+      <div class="result-card">
+        <p class="eyebrow">Multiplayer Result</p>
+        <h2>최종 순위</h2>
+        <div id="multi-result-list" class="leaderboard"></div>
+      </div>
+      <div class="button-group">
+        <button id="multi-result-home-btn" class="primary-btn">메인으로</button>
+      </div>
+    </section>
+
     <section id="how-to-screen" class="screen">
       <header class="top-bar">
         <button class="back-btn" data-target="home-screen">←</button>
@@ -85,10 +182,15 @@
         <p>2. 힌트 없이 맞히면 10점, 힌트 사용 후 맞히면 5점입니다.</p>
         <p>3. 정답 보기를 누르면 해당 문제는 0점 처리됩니다.</p>
         <p>4. 총 10문제를 풀고 최종 점수를 확인합니다.</p>
+        <p>5. 친구랑 같이하기에서는 같은 방의 플레이어 중 먼저 맞힌 사람만 점수를 얻습니다.</p>
       </div>
     </section>
   </main>
 
+  <script src="firebase-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
   <script src="script.js"></script>
+  <script src="multiplayer.js"></script>
 </body>
 </html>
