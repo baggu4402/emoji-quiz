@@ -1,11 +1,15 @@
 (() => {
   const PLAYER_ID_KEY = "emojiQuizPlayerId";
   const unavailableMessage = "멀티플레이는 Firebase 설정 후 사용할 수 있습니다.";
+  const authFailedMessage = "멀티플레이 인증에 실패했습니다. Firebase Anonymous Auth 설정을 확인해주세요.";
   const roundReadyMessage = "가장 먼저 맞히면 +10점";
   const ROUND_TIME_LIMIT_SECONDS = 20;
   const MAX_ROOM_PLAYERS = 6;
 
   let db = null;
+  let auth = null;
+  let authStateReadyPromise = null;
+  let authReadyPromise = null;
   let currentRoomCode = "";
   let currentPlayerId = "";
   let currentPlayerName = "";
@@ -53,6 +57,7 @@
       window.firebaseConfig &&
       window.firebase &&
       typeof window.firebase.initializeApp === "function" &&
+      typeof window.firebase.auth === "function" &&
       typeof window.firebase.database === "function"
     );
   }
@@ -67,7 +72,79 @@
     }
 
     db = window.firebase.database();
+    auth = window.firebase.auth();
     return true;
+  }
+
+  function waitForAuthState() {
+    if (!auth) return Promise.resolve(null);
+
+    if (!authStateReadyPromise) {
+      authStateReadyPromise = new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged((user) => {
+          unsubscribe();
+          if (user?.uid) {
+            currentPlayerId = user.uid;
+          }
+          resolve(user);
+        }, () => {
+          unsubscribe();
+          resolve(null);
+        });
+      });
+    }
+
+    return authStateReadyPromise;
+  }
+
+  function getFallbackPlayerId() {
+    const savedId = localStorage.getItem(PLAYER_ID_KEY);
+    if (savedId) return savedId;
+
+    const newId = `player_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    localStorage.setItem(PLAYER_ID_KEY, newId);
+    return newId;
+  }
+
+  function getCurrentPlayerId() {
+    if (auth?.currentUser?.uid) {
+      return auth.currentUser.uid;
+    }
+
+    return currentPlayerId || getFallbackPlayerId();
+  }
+
+  async function ensureAnonymousAuth() {
+    if (!initFirebase()) {
+      throw new Error("Firebase is not ready");
+    }
+
+    const restoredUser = await waitForAuthState();
+    if (restoredUser?.uid) {
+      currentPlayerId = restoredUser.uid;
+      return restoredUser;
+    }
+
+    if (auth.currentUser) {
+      currentPlayerId = auth.currentUser.uid;
+      return auth.currentUser;
+    }
+
+    if (!authReadyPromise) {
+      authReadyPromise = auth.signInAnonymously()
+        .then((credential) => {
+          currentPlayerId = credential.user.uid;
+          return credential.user;
+        })
+        .catch((error) => {
+          authReadyPromise = null;
+          throw error;
+        });
+    }
+
+    const user = await authReadyPromise;
+    currentPlayerId = user.uid;
+    return user;
   }
 
   function setText(element, text) {
@@ -132,15 +209,6 @@
     }
 
     return code;
-  }
-
-  function getOrCreatePlayerId() {
-    const savedId = localStorage.getItem(PLAYER_ID_KEY);
-    if (savedId) return savedId;
-
-    const newId = `player_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    localStorage.setItem(PLAYER_ID_KEY, newId);
-    return newId;
   }
 
   function getPlayerName() {
@@ -688,7 +756,15 @@
       return;
     }
 
-    currentPlayerId = getOrCreatePlayerId();
+    try {
+      await ensureAnonymousAuth();
+    } catch (error) {
+      console.warn("Failed to sign in anonymously", error);
+      setMenuStatus(authFailedMessage, "error");
+      return;
+    }
+
+    currentPlayerId = getCurrentPlayerId();
 
     try {
       await cleanupOldRooms();
@@ -742,7 +818,15 @@
       return;
     }
 
-    currentPlayerId = getOrCreatePlayerId();
+    try {
+      await ensureAnonymousAuth();
+    } catch (error) {
+      console.warn("Failed to sign in anonymously", error);
+      setMenuStatus(authFailedMessage, "error");
+      return;
+    }
+
+    currentPlayerId = getCurrentPlayerId();
     const roomSnapshot = await db.ref(`rooms/${roomCode}`).get();
 
     if (!roomSnapshot.exists()) {
