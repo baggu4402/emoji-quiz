@@ -2,6 +2,7 @@
   const PLAYER_ID_KEY = "emojiQuizPlayerId";
   const unavailableMessage = "멀티플레이는 Firebase 설정 후 사용할 수 있습니다.";
   const roundReadyMessage = "가장 먼저 맞히면 +10점";
+  const ROUND_TIME_LIMIT_SECONDS = 20;
 
   let db = null;
   let currentRoomCode = "";
@@ -10,6 +11,7 @@
   let isHost = false;
   let roomRef = null;
   let latestRoom = null;
+  let multiTimerId = null;
 
   const multiplayerOpenBtn = document.querySelector("#multiplayer-open-btn");
   const createRoomBtn = document.querySelector("#create-room-btn");
@@ -27,6 +29,7 @@
   const multiCategorySelect = document.querySelector("#multi-category-select");
   const multiRoomLabel = document.querySelector("#multi-room-label");
   const multiQuestionCount = document.querySelector("#multi-question-count");
+  const multiTimerText = document.querySelector("#multi-timer-text");
   const multiMyScore = document.querySelector("#multi-my-score");
   const multiEmojiText = document.querySelector("#multi-emoji-text");
   const multiRoundStatus = document.querySelector("#multi-round-status");
@@ -172,6 +175,8 @@
   }
 
   function clearRoomSubscription() {
+    stopMultiplayerTimer();
+
     if (roomRef) {
       roomRef.off("value");
     }
@@ -273,6 +278,77 @@
     return quizData[quizIndex] || null;
   }
 
+  function getRemainingSeconds(currentRound = {}) {
+    const startedAt = currentRound.startedAt || Date.now();
+    const timeLimitSeconds = currentRound.timeLimitSeconds || ROUND_TIME_LIMIT_SECONDS;
+    const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+
+    return Math.max(0, timeLimitSeconds - elapsedSeconds);
+  }
+
+  function renderTimerText(remainingSeconds) {
+    if (!multiTimerText) return;
+
+    multiTimerText.textContent = `남은 시간 ${remainingSeconds}초`;
+    multiTimerText.classList.toggle("danger", remainingSeconds <= 5);
+  }
+
+  function stopMultiplayerTimer() {
+    if (multiTimerId) {
+      clearInterval(multiTimerId);
+      multiTimerId = null;
+    }
+  }
+
+  async function markCurrentRoundTimeOver(room) {
+    if (!isHost || !currentRoomCode || !db) return;
+
+    const question = getCurrentQuestion(room);
+    if (!question) return;
+
+    await db.ref(`rooms/${currentRoomCode}/currentRound`).transaction((currentRound) => {
+      if (!currentRound || currentRound.winnerId || currentRound.isTimeOver) {
+        return currentRound;
+      }
+
+      return {
+        ...currentRound,
+        isTimeOver: true,
+        answer: question.answers[0],
+        answeredAt: Date.now(),
+      };
+    });
+  }
+
+  function startMultiplayerTimer(room) {
+    const currentRound = room?.currentRound || {};
+
+    stopMultiplayerTimer();
+
+    if (currentRound.winnerId || currentRound.isTimeOver) {
+      renderTimerText(0);
+      return;
+    }
+
+    const tick = () => {
+      const remainingSeconds = getRemainingSeconds(currentRound);
+      renderTimerText(remainingSeconds);
+
+      if (remainingSeconds <= 0) {
+        stopMultiplayerTimer();
+        markCurrentRoundTimeOver(room).catch(() => {
+          if (multiRoundStatus) {
+            multiRoundStatus.textContent = "시간 초과를 처리할 수 없습니다. 잠시 후 다시 시도해주세요.";
+            multiRoundStatus.className = "feedback-text wrong";
+          }
+        });
+      }
+    };
+
+    tick();
+    multiTimerId = setInterval(tick, 1000);
+  }
+
   function resetRoundInputIfNeeded(room) {
     if (!multiAnswerInput) return;
 
@@ -293,6 +369,8 @@
       : getQuestionLimit();
     const currentRound = room?.currentRound || {};
     const hasWinner = Boolean(currentRound.winnerId);
+    const isTimeOver = Boolean(currentRound.isTimeOver);
+    const roundEnded = hasWinner || isTimeOver;
 
     resetRoundInputIfNeeded(room);
     setText(multiRoomLabel, `방 코드 ${currentRoomCode || room?.code || "----"}`);
@@ -302,17 +380,20 @@
     renderMultiplayerScoreboard(players);
 
     if (multiAnswerInput) {
-      multiAnswerInput.disabled = hasWinner;
+      multiAnswerInput.disabled = roundEnded;
     }
 
     if (multiSubmitBtn) {
-      multiSubmitBtn.disabled = hasWinner;
+      multiSubmitBtn.disabled = roundEnded;
     }
 
     if (multiRoundStatus) {
       if (hasWinner) {
-        multiRoundStatus.textContent = `${currentRound.winnerName || "누군가"}님이 먼저 맞혔습니다. 정답: ${currentRound.answer || ""}`;
+        multiRoundStatus.textContent = `${currentRound.winnerName || "누군가"}님이 먼저 맞혔습니다! 정답: ${currentRound.answer || ""}`;
         multiRoundStatus.className = "feedback-text correct";
+      } else if (isTimeOver) {
+        multiRoundStatus.textContent = `시간 초과! 정답: ${currentRound.answer || question?.answers?.[0] || ""}`;
+        multiRoundStatus.className = "feedback-text wrong";
       } else {
         multiRoundStatus.textContent = roundReadyMessage;
         multiRoundStatus.className = "feedback-text";
@@ -322,8 +403,15 @@
     if (multiNextBtn) {
       const isLastQuestion = currentIndex >= questionTotal - 1;
       multiNextBtn.textContent = isLastQuestion ? "결과 보기" : "다음 문제";
-      multiNextBtn.classList.toggle("hidden", !isHost || !hasWinner);
-      multiNextBtn.disabled = !isHost || !hasWinner;
+      multiNextBtn.classList.toggle("hidden", !isHost || !roundEnded);
+      multiNextBtn.disabled = !isHost || !roundEnded;
+    }
+
+    if (roundEnded) {
+      stopMultiplayerTimer();
+      renderTimerText(isTimeOver ? 0 : getRemainingSeconds(currentRound));
+    } else {
+      startMultiplayerTimer(room);
     }
   }
 
@@ -347,6 +435,7 @@
     renderPlayers(room.players || {});
 
     if (room.status === "waiting") {
+      stopMultiplayerTimer();
       showScreenSafe("room-screen");
       return;
     }
@@ -358,6 +447,7 @@
     }
 
     if (room.status === "finished") {
+      stopMultiplayerTimer();
       showScreenSafe("multi-result-screen");
       renderMultiplayerResult(room.players || {});
     }
@@ -528,6 +618,9 @@
         winnerName: null,
         answer: null,
         answeredAt: null,
+        startedAt: Date.now(),
+        timeLimitSeconds: ROUND_TIME_LIMIT_SECONDS,
+        isTimeOver: false,
       },
     });
   }
@@ -538,7 +631,9 @@
     const roomSnapshot = await db.ref(`rooms/${currentRoomCode}`).get();
     const room = roomSnapshot.val();
 
-    if (!room || room.status !== "playing" || room.currentRound?.winnerId) return;
+    if (!room || room.status !== "playing") return;
+    if (room.currentRound?.winnerId || room.currentRound?.isTimeOver) return;
+    if (getRemainingSeconds(room.currentRound) <= 0) return;
 
     const question = getCurrentQuestion(room);
     const userAnswer = normalizeMultiplayerAnswer(multiAnswerInput.value.trim());
@@ -560,12 +655,12 @@
 
     const roundRef = db.ref(`rooms/${currentRoomCode}/currentRound`);
     const transactionResult = await roundRef.transaction((currentRound) => {
-      if (!currentRound || currentRound.winnerId) {
-        return;
+      if (!currentRound || currentRound.winnerId || currentRound.isTimeOver) {
+        return currentRound;
       }
 
       return {
-        index: room.currentQuestionIndex || 0,
+        ...currentRound,
         winnerId: currentPlayerId,
         winnerName: currentPlayerName,
         answer: question.answers[0],
@@ -589,7 +684,7 @@
     const roomSnapshot = await db.ref(`rooms/${currentRoomCode}`).get();
     const room = roomSnapshot.val();
 
-    if (!room?.currentRound?.winnerId) return;
+    if (!room?.currentRound?.winnerId && !room?.currentRound?.isTimeOver) return;
 
     const nextIndex = (room.currentQuestionIndex || 0) + 1;
     const questionTotal = Array.isArray(room.questionIndexes) ? room.questionIndexes.length : 0;
@@ -607,6 +702,9 @@
         winnerName: null,
         answer: null,
         answeredAt: null,
+        startedAt: Date.now(),
+        timeLimitSeconds: ROUND_TIME_LIMIT_SECONDS,
+        isTimeOver: false,
       },
     });
   }
