@@ -2454,6 +2454,8 @@ const showAnswerBtn = document.querySelector("#show-answer-btn");
 const nextBtn = document.querySelector("#next-btn");
 const soloBackBtn = document.querySelector("#solo-back-btn");
 const shareSoloResultBtn = document.querySelector("#share-solo-result-btn");
+const copyBugReportBtn = document.querySelector("#copy-bug-report-btn");
+const bugReportStatus = document.querySelector("#bug-report-status");
 const finalScore = document.querySelector("#final-score");
 const bestMessage = document.querySelector("#best-message");
 const correctCountText = document.querySelector("#correct-count");
@@ -2470,8 +2472,11 @@ function copyTextWithFallback(text) {
   textarea.setAttribute("readonly", "");
   textarea.style.position = "fixed";
   textarea.style.left = "-9999px";
+  textarea.style.top = "0";
   document.body.appendChild(textarea);
+  textarea.focus();
   textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
 
   try {
     return document.execCommand("copy");
@@ -2482,8 +2487,12 @@ function copyTextWithFallback(text) {
 
 async function copyTextToClipboardForSolo(text) {
   if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (error) {
+      console.warn("Clipboard API failed, trying fallback copy", error);
+    }
   }
 
   if (!copyTextWithFallback(text)) {
@@ -2509,6 +2518,86 @@ async function shareSoloResult() {
     bestMessage.textContent = "결과가 복사되었습니다.";
   } catch (error) {
     bestMessage.textContent = "복사에 실패했습니다. 직접 선택해서 복사해주세요.";
+  }
+}
+
+function getPublicDebugId(value) {
+  if (!value || value === "-") return "-";
+  return String(value).slice(0, 12);
+}
+
+window.getSoloDebugSnapshot = function getSoloDebugSnapshot() {
+  return {
+    selectedCategory,
+    selectedDifficulty: typeof selectedDifficulty !== "undefined" ? selectedDifficulty : "all",
+    score,
+    currentIndex,
+    questionCount: Array.isArray(questions) ? questions.length : 0,
+  };
+};
+
+function getBugReportText() {
+  const solo = window.getSoloDebugSnapshot?.() || {};
+  const multi = window.getMultiplayerDebugSnapshot?.() || {};
+  const questionCount = solo.questionCount || "-";
+  const currentQuestion = solo.questionCount ? (solo.currentIndex ?? 0) + 1 : "-";
+
+  return [
+    "이게 뭔데? Emoji Quiz 버그 리포트",
+    "",
+    "[기본 정보]",
+    `URL: ${window.location.href}`,
+    `User Agent: ${navigator.userAgent}`,
+    `시간: ${new Date().toLocaleString()}`,
+    "",
+    "[싱글 플레이 상태]",
+    `선택 카테고리: ${solo.selectedCategory || "-"}`,
+    `선택 난이도: ${solo.selectedDifficulty || "-"}`,
+    `현재 점수: ${solo.score ?? "-"}`,
+    `현재 문제: ${currentQuestion} / ${questionCount}`,
+    "",
+    "[멀티플레이 상태]",
+    `Firebase: ${multi.firebase || "-"}`,
+    `Auth: ${multi.auth || "-"}`,
+    `Player ID: ${getPublicDebugId(multi.playerId)}`,
+    `Room Code: ${multi.roomCode || "-"}`,
+    `Is Host: ${multi.isHost ?? "-"}`,
+    `Room Status: ${multi.roomStatus || "-"}`,
+    `Last Error: ${multi.lastError || "-"}`,
+    "",
+    "[어떤 문제가 있었나요?]",
+    "- ",
+    "",
+    "[재현 방법]",
+    "1. ",
+    "2. ",
+    "3. ",
+    "",
+    "[기대 동작]",
+    "- ",
+    "",
+    "[실제 동작]",
+    "- ",
+    "",
+    "[스크린샷]",
+    "- 가능하면 첨부",
+  ].join("\n");
+}
+
+function setBugReportStatus(text, type = "") {
+  if (!bugReportStatus) return;
+
+  bugReportStatus.textContent = text;
+  bugReportStatus.classList.toggle("success", type === "success");
+  bugReportStatus.classList.toggle("error", type === "error");
+}
+
+async function copyBugReport() {
+  try {
+    await copyTextToClipboardForSolo(getBugReportText());
+    setBugReportStatus("버그 리포트 양식이 복사되었습니다.", "success");
+  } catch (error) {
+    setBugReportStatus("복사에 실패했습니다. 직접 선택해서 복사해주세요.", "error");
   }
 }
 
@@ -2799,6 +2888,7 @@ function bindEvents() {
   document.querySelector("#retry-btn").addEventListener("click", () => startGame(selectedCategory));
   document.querySelector("#home-btn").addEventListener("click", () => showScreen("home-screen"));
   shareSoloResultBtn?.addEventListener("click", shareSoloResult);
+  copyBugReportBtn?.addEventListener("click", copyBugReport);
   if (soloBackBtn) {
     soloBackBtn.addEventListener("click", () => showScreen(previousSoloScreen || "home-screen"));
   }

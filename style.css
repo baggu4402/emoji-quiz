@@ -444,6 +444,26 @@ h2 {
   margin-bottom: 0;
 }
 
+.test-guide-card {
+  margin-top: 16px;
+}
+
+.test-guide-card h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.test-guide-card #copy-bug-report-btn {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.test-guide-card .status-text {
+  min-height: 22px;
+  margin: 10px 0 0;
+  text-align: center;
+}
+
 @media (max-width: 360px) {
   .app {
     padding: 18px 14px;

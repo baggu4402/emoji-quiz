@@ -20,6 +20,7 @@
   let multiTimerId = null;
   let lastResultPlayers = {};
   let lastFirebaseError = "";
+  let lastRoomStatus = "-";
 
   const multiplayerOpenBtn = document.querySelector("#multiplayer-open-btn");
   const createRoomBtn = document.querySelector("#create-room-btn");
@@ -68,6 +69,8 @@
   const debugLastError = document.querySelector("#debug-last-error");
 
   function updateDebugPanel(room = latestRoom) {
+    lastRoomStatus = room?.status || lastRoomStatus || "-";
+
     if (debugFirebaseState) {
       debugFirebaseState.textContent = db ? "connected" : "not ready";
     }
@@ -89,7 +92,7 @@
     }
 
     if (debugRoomStatus) {
-      debugRoomStatus.textContent = room?.status || "-";
+      debugRoomStatus.textContent = room?.status || lastRoomStatus || "-";
     }
 
     if (debugLastError) {
@@ -418,8 +421,12 @@
 
   async function writeTextToClipboard(text) {
     if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return;
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch (error) {
+        console.warn("Clipboard API failed, trying fallback copy", error);
+      }
     }
 
     if (!copyTextWithFallback(text)) {
@@ -807,6 +814,7 @@
       latestRoom = null;
       currentRoomCode = "";
       isHost = false;
+      lastRoomStatus = "-";
       roomRef = null;
       updateDebugPanel(null);
       renderPlayers({});
@@ -1083,6 +1091,7 @@
 
     currentRoomCode = "";
     isHost = false;
+    lastRoomStatus = "-";
     roomRef = null;
     latestRoom = null;
     updateDebugPanel(null);
@@ -1245,6 +1254,18 @@
       `<option value="${difficulty.id}">${escapeHtml(difficulty.name)}</option>`
     )).join("");
   }
+
+  window.getMultiplayerDebugSnapshot = function getMultiplayerDebugSnapshot() {
+    return {
+      firebase: db ? "connected" : "not ready",
+      auth: auth?.currentUser ? "signed in" : "signed out",
+      playerId: currentPlayerId || "-",
+      roomCode: currentRoomCode || "-",
+      isHost: Boolean(isHost),
+      roomStatus: lastRoomStatus || latestRoom?.status || "-",
+      lastError: lastFirebaseError || "-",
+    };
+  };
 
   function bindEvents() {
     if (debugToggleBtn && debugPanel) {
