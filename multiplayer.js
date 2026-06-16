@@ -687,14 +687,14 @@
       .slice(-8);
 
     if (!entries.length) {
-      multiWrongAnswerList.innerHTML = `<p class="empty-player">아직 오답이 없습니다.</p>`;
+      multiWrongAnswerList.innerHTML = `<div class="wrong-answer-empty">아직 오답 없음</div>`;
       return;
     }
 
     multiWrongAnswerList.innerHTML = entries.map((entry) => `
       <div class="wrong-answer-row ${entry.playerId === currentPlayerId ? "is-me" : ""}">
-        <span class="wrong-answer-name">${escapeHtml(entry.playerName || "플레이어")}${entry.playerId === currentPlayerId ? " · 나" : ""}</span>
-        <span class="wrong-answer-text">${escapeHtml(entry.answer || "")}</span>
+        <span class="wrong-player">${escapeHtml(entry.playerName || "익명")}${entry.playerId === currentPlayerId ? " · 나" : ""}</span>
+        <span class="wrong-text">${escapeHtml(entry.answer || "")}</span>
       </div>
     `).join("");
     multiWrongAnswerList.scrollTop = multiWrongAnswerList.scrollHeight;

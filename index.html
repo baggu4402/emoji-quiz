@@ -183,46 +183,40 @@
     </section>
 
     <section id="multi-quiz-screen" class="screen">
-      <div class="multi-play-layout">
-        <div class="multi-main-column">
-          <header class="quiz-header">
-            <div>
-              <p id="multi-room-label" class="small-label">방 코드 ----</p>
-              <p id="multi-difficulty-label" class="difficulty-label normal">보통</p>
-              <h2 id="multi-question-count">문제 1 / 10</h2>
-              <p id="multi-timer-text" class="timer-text">남은 시간 20초</p>
-            </div>
-            <div class="score-box">
-              <span>내 점수</span>
-              <strong id="multi-my-score">0</strong>
-            </div>
-          </header>
-
-          <article class="quiz-card">
-            <div id="multi-emoji-text" class="emoji-text">🎮</div>
-            <div id="multi-correct-burst" class="correct-burst hidden">✨ 성공! ✨</div>
-            <p id="multi-round-status" class="feedback-text"></p>
-            <p id="multi-hint-text" class="hint-text hidden"></p>
-            <input id="multi-answer-input" class="answer-input" type="text" autocomplete="off" placeholder="빠르게 정답 입력" />
-          </article>
-
-          <div id="multi-scoreboard" class="scoreboard"></div>
-
-          <div class="quiz-actions">
-            <button id="multi-submit-btn" class="primary-btn">정답 제출</button>
-            <button id="multi-next-btn" class="secondary-btn hidden">다음 문제</button>
-            <button id="multi-leave-btn" class="ghost-btn">방 나가기</button>
+      <div class="multi-main-column">
+        <header class="quiz-header">
+          <div>
+            <p id="multi-room-label" class="small-label">방 코드 ----</p>
+            <p id="multi-difficulty-label" class="difficulty-label normal">보통</p>
+            <h2 id="multi-question-count">문제 1 / 10</h2>
+            <p id="multi-timer-text" class="timer-text">남은 시간 20초</p>
           </div>
+          <div class="score-box">
+            <span>내 점수</span>
+            <strong id="multi-my-score">0</strong>
+          </div>
+        </header>
+
+        <article class="quiz-card">
+          <div id="multi-emoji-text" class="emoji-text">🎮</div>
+          <div id="multi-correct-burst" class="correct-burst hidden">✨ 성공! ✨</div>
+          <p id="multi-round-status" class="feedback-text"></p>
+          <p id="multi-hint-text" class="hint-text hidden"></p>
+          <input id="multi-answer-input" class="answer-input" type="text" autocomplete="off" placeholder="빠르게 정답 입력" />
+        </article>
+
+        <div id="multi-scoreboard" class="scoreboard"></div>
+
+        <div class="quiz-actions">
+          <button id="multi-submit-btn" class="primary-btn">정답 제출</button>
+          <button id="multi-next-btn" class="secondary-btn hidden">다음 문제</button>
+          <button id="multi-leave-btn" class="ghost-btn">방 나가기</button>
         </div>
-
-        <aside class="wrong-feed wrong-feed-side">
-          <div class="panel-title-row">
-            <h3>오답 로그</h3>
-            <span>실시간</span>
-          </div>
-          <div id="multi-wrong-answer-list" class="wrong-answer-list"></div>
-        </aside>
       </div>
+
+      <aside id="wrong-feed-panel" class="wrong-feed-panel">
+        <div id="multi-wrong-answer-list" class="wrong-answer-list"></div>
+      </aside>
     </section>
 
     <section id="multi-result-screen" class="screen">

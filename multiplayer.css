@@ -108,9 +108,8 @@
   color: var(--danger);
 }
 
-.multi-play-layout {
+#multi-quiz-screen {
   position: relative;
-  width: 100%;
 }
 
 .multi-main-column {
@@ -137,22 +136,19 @@
   background: #fff8ef;
 }
 
-.wrong-feed {
-  padding: 16px;
+.wrong-feed-panel {
+  position: fixed;
+  top: 150px;
+  right: max(32px, calc((100vw - 1180px) / 2));
+  z-index: 30;
+  width: 300px;
+  max-height: calc(100vh - 210px);
+  padding: 14px;
   border: 1px solid var(--line);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: var(--shadow);
   backdrop-filter: blur(12px);
-}
-
-.wrong-feed-side {
-  position: fixed;
-  top: 140px;
-  right: max(24px, calc((100vw - 1100px) / 2));
-  z-index: 20;
-  width: 300px;
-  max-height: calc(100vh - 190px);
   overflow: hidden;
 }
 
@@ -175,20 +171,22 @@
 }
 
 .wrong-answer-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  margin-top: 12px;
-  max-height: 360px;
+  max-height: calc(100vh - 250px);
   overflow-y: auto;
+  padding-right: 4px;
 }
 
 .wrong-answer-row {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   padding: 10px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(241, 216, 196, 0.8);
+  border: 1px solid rgba(241, 216, 196, 0.85);
   background: #fffaf4;
+  font-size: 14px;
   font-weight: 800;
 }
 
@@ -196,20 +194,26 @@
   outline: 2px solid rgba(55, 164, 102, 0.25);
 }
 
-.wrong-answer-name {
+.wrong-player {
   color: var(--muted);
   font-size: 12px;
+  font-weight: 900;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.wrong-answer-text {
+.wrong-text {
   min-width: 0;
   color: var(--danger);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
+}
+
+.wrong-answer-empty {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  text-align: center;
 }
 
 .player-row {
@@ -382,8 +386,8 @@ button:disabled {
 }
 
 @media (max-width: 900px) {
-  .wrong-feed-side {
-    display: none;
+  .wrong-feed-panel {
+    display: none !important;
   }
 
   .multi-main-column {
