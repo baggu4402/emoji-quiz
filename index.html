@@ -211,6 +211,19 @@
         <p>5. 친구랑 같이하기에서는 같은 방의 플레이어 중 먼저 맞힌 사람만 점수를 얻습니다.</p>
       </div>
     </section>
+
+    <section id="debug-panel" class="debug-panel collapsed">
+      <button id="debug-toggle-btn" class="debug-toggle-btn" type="button">상태</button>
+      <div class="debug-content">
+        <p><strong>Firebase:</strong> <span id="debug-firebase-state">unknown</span></p>
+        <p><strong>Auth:</strong> <span id="debug-auth-state">unknown</span></p>
+        <p><strong>Player:</strong> <span id="debug-player-id">-</span></p>
+        <p><strong>Room:</strong> <span id="debug-room-code">-</span></p>
+        <p><strong>Host:</strong> <span id="debug-is-host">false</span></p>
+        <p><strong>Status:</strong> <span id="debug-room-status">-</span></p>
+        <p><strong>Error:</strong> <span id="debug-last-error">-</span></p>
+      </div>
+    </section>
   </main>
 
   <script src="firebase-config.js"></script>

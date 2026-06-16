@@ -92,6 +92,22 @@ Firebase 콘솔에서:
 - Firebase Console > Authentication > Sign-in method > Anonymous를 반드시 활성화해야 합니다.
 - Rules 적용 후 `PERMISSION_DENIED`가 나면 브라우저를 새로고침한 뒤 다시 로그인 상태를 확인합니다.
 
+## 테스트용 상태 패널
+
+멀티플레이 테스트 중 화면 오른쪽 아래의 `상태` 버튼을 누르면 Firebase/Auth/Room 상태를 확인할 수 있습니다.
+
+표시 항목:
+
+- Firebase 연결 상태
+- Auth 로그인 상태
+- playerId
+- roomCode
+- 방장 여부
+- 방 상태
+- 마지막 Firebase 오류
+
+배포 전에는 숨김 처리하거나 제거할 수 있습니다.
+
 ## 멀티플레이 초대 방법
 
 1. 방장이 방을 만든다.

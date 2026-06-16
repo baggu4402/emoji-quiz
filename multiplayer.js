@@ -18,6 +18,7 @@
   let latestRoom = null;
   let multiTimerId = null;
   let lastResultPlayers = {};
+  let lastFirebaseError = "";
 
   const multiplayerOpenBtn = document.querySelector("#multiplayer-open-btn");
   const createRoomBtn = document.querySelector("#create-room-btn");
@@ -51,6 +52,50 @@
   const multiResultStatus = document.querySelector("#multi-result-status");
   const multiResultHomeBtn = document.querySelector("#multi-result-home-btn");
   const shareMultiResultBtn = document.querySelector("#share-multi-result-btn");
+  const debugPanel = document.querySelector("#debug-panel");
+  const debugToggleBtn = document.querySelector("#debug-toggle-btn");
+  const debugFirebaseState = document.querySelector("#debug-firebase-state");
+  const debugAuthState = document.querySelector("#debug-auth-state");
+  const debugPlayerId = document.querySelector("#debug-player-id");
+  const debugRoomCode = document.querySelector("#debug-room-code");
+  const debugIsHost = document.querySelector("#debug-is-host");
+  const debugRoomStatus = document.querySelector("#debug-room-status");
+  const debugLastError = document.querySelector("#debug-last-error");
+
+  function updateDebugPanel(room = latestRoom) {
+    if (debugFirebaseState) {
+      debugFirebaseState.textContent = db ? "connected" : "not ready";
+    }
+
+    if (debugAuthState) {
+      debugAuthState.textContent = auth?.currentUser ? "signed in" : "signed out";
+    }
+
+    if (debugPlayerId) {
+      debugPlayerId.textContent = currentPlayerId || "-";
+    }
+
+    if (debugRoomCode) {
+      debugRoomCode.textContent = currentRoomCode || "-";
+    }
+
+    if (debugIsHost) {
+      debugIsHost.textContent = String(Boolean(isHost));
+    }
+
+    if (debugRoomStatus) {
+      debugRoomStatus.textContent = room?.status || "-";
+    }
+
+    if (debugLastError) {
+      debugLastError.textContent = lastFirebaseError || "-";
+    }
+  }
+
+  function setLastFirebaseError(error) {
+    lastFirebaseError = error?.message || String(error || "");
+    updateDebugPanel();
+  }
 
   function isFirebaseReady() {
     return Boolean(
@@ -64,6 +109,7 @@
 
   function initFirebase() {
     if (!isFirebaseReady()) {
+      updateDebugPanel();
       return false;
     }
 
@@ -73,6 +119,7 @@
 
     db = window.firebase.database();
     auth = window.firebase.auth();
+    updateDebugPanel();
     return true;
   }
 
@@ -86,9 +133,11 @@
           if (user?.uid) {
             currentPlayerId = user.uid;
           }
+          updateDebugPanel();
           resolve(user);
         }, () => {
           unsubscribe();
+          updateDebugPanel();
           resolve(null);
         });
       });
@@ -122,11 +171,13 @@
     const restoredUser = await waitForAuthState();
     if (restoredUser?.uid) {
       currentPlayerId = restoredUser.uid;
+      updateDebugPanel();
       return restoredUser;
     }
 
     if (auth.currentUser) {
       currentPlayerId = auth.currentUser.uid;
+      updateDebugPanel();
       return auth.currentUser;
     }
 
@@ -134,16 +185,19 @@
       authReadyPromise = auth.signInAnonymously()
         .then((credential) => {
           currentPlayerId = credential.user.uid;
+          updateDebugPanel();
           return credential.user;
         })
         .catch((error) => {
           authReadyPromise = null;
+          setLastFirebaseError(error);
           throw error;
         });
     }
 
     const user = await authReadyPromise;
     currentPlayerId = user.uid;
+    updateDebugPanel();
     return user;
   }
 
@@ -490,6 +544,7 @@
     }
 
     updateHostControls(room);
+    updateDebugPanel(room);
   }
 
   function getCurrentQuestion(room) {
@@ -562,7 +617,8 @@
 
       if (remainingSeconds <= 0) {
         stopMultiplayerTimer();
-        markCurrentRoundTimeOver(room).catch(() => {
+        markCurrentRoundTimeOver(room).catch((error) => {
+          setLastFirebaseError(error);
           if (multiRoundStatus) {
             multiRoundStatus.textContent = "시간 초과를 처리할 수 없습니다. 잠시 후 다시 시도해주세요.";
             multiRoundStatus.className = "feedback-text wrong";
@@ -666,6 +722,7 @@
       currentRoomCode = "";
       isHost = false;
       roomRef = null;
+      updateDebugPanel(null);
       renderPlayers({});
       setText(roomCodeDisplay, "----");
       setRoomStatus("방이 종료되었습니다.");
@@ -698,13 +755,17 @@
   function subscribeRoom(roomCode) {
     clearRoomSubscription();
     roomRef = db.ref(`rooms/${roomCode}`);
-    roomRef.on("value", renderRoomState);
+    roomRef.on("value", renderRoomState, (error) => {
+      setLastFirebaseError(error);
+      setRoomStatus("방 정보를 불러올 수 없습니다. 권한 또는 연결 상태를 확인해주세요.", "error");
+    });
   }
 
   function enterRoomScreen(roomCode) {
     currentRoomCode = roomCode;
     setText(roomCodeDisplay, roomCode);
     setRoomStatus("");
+    updateDebugPanel();
     showScreenSafe("room-screen");
     subscribeRoom(roomCode);
   }
@@ -760,6 +821,7 @@
       await ensureAnonymousAuth();
     } catch (error) {
       console.warn("Failed to sign in anonymously", error);
+      setLastFirebaseError(error);
       setMenuStatus(authFailedMessage, "error");
       return;
     }
@@ -770,6 +832,7 @@
       await cleanupOldRooms();
     } catch (error) {
       console.warn("Failed to cleanup old rooms", error);
+      setLastFirebaseError(error);
     }
 
     const roomCode = await findAvailableRoomCode();
@@ -794,6 +857,7 @@
 
     await db.ref(`rooms/${roomCode}`).set(roomData);
     isHost = true;
+    updateDebugPanel(roomData);
     setMenuStatus("");
     enterRoomScreen(roomCode);
   }
@@ -822,6 +886,7 @@
       await ensureAnonymousAuth();
     } catch (error) {
       console.warn("Failed to sign in anonymously", error);
+      setLastFirebaseError(error);
       setMenuStatus(authFailedMessage, "error");
       return;
     }
@@ -870,6 +935,7 @@
 
     await db.ref(`rooms/${roomCode}/players/${currentPlayerId}`).set(playerData);
     isHost = room.hostId === currentPlayerId || playerData.isHost;
+    updateDebugPanel(room);
     setMenuStatus("");
     enterRoomScreen(roomCode);
   }
@@ -909,6 +975,7 @@
     isHost = false;
     roomRef = null;
     latestRoom = null;
+    updateDebugPanel(null);
     renderPlayers({});
     renderMultiplayerScoreboard({});
     setText(roomCodeDisplay, "----");
@@ -1069,6 +1136,12 @@
   }
 
   function bindEvents() {
+    if (debugToggleBtn && debugPanel) {
+      debugToggleBtn.addEventListener("click", () => {
+        debugPanel.classList.toggle("collapsed");
+      });
+    }
+
     multiplayerOpenBtn?.addEventListener("click", () => {
       if (!applyRoomCodeFromUrl(true)) {
         setMenuStatus("");
@@ -1095,31 +1168,36 @@
     });
 
     createRoomBtn?.addEventListener("click", () => {
-      createRoom().catch(() => {
+      createRoom().catch((error) => {
+        setLastFirebaseError(error);
         setMenuStatus("방을 만들 수 없습니다. 잠시 후 다시 시도해주세요.");
       });
     });
 
     joinRoomBtn?.addEventListener("click", () => {
-      joinRoom().catch(() => {
+      joinRoom().catch((error) => {
+        setLastFirebaseError(error);
         setMenuStatus("방에 참가할 수 없습니다. 잠시 후 다시 시도해주세요.");
       });
     });
 
     leaveRoomBtn?.addEventListener("click", () => {
-      leaveCurrentRoom().catch(() => {
+      leaveCurrentRoom().catch((error) => {
+        setLastFirebaseError(error);
         setRoomStatus("방을 나갈 수 없습니다. 잠시 후 다시 시도해주세요.");
       });
     });
 
     multiLeaveBtn?.addEventListener("click", () => {
-      leaveCurrentRoom().catch(() => {
+      leaveCurrentRoom().catch((error) => {
+        setLastFirebaseError(error);
         setRoomStatus("방을 나갈 수 없습니다. 잠시 후 다시 시도해주세요.");
       });
     });
 
     multiResultHomeBtn?.addEventListener("click", () => {
-      leaveCurrentRoom(true).catch(() => {
+      leaveCurrentRoom(true).catch((error) => {
+        setLastFirebaseError(error);
         showScreenSafe("home-screen");
       });
     });
@@ -1127,13 +1205,15 @@
     shareMultiResultBtn?.addEventListener("click", shareMultiplayerResult);
 
     startRoomGameBtn?.addEventListener("click", () => {
-      startRoomGame().catch(() => {
+      startRoomGame().catch((error) => {
+        setLastFirebaseError(error);
         setRoomStatus("게임을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.");
       });
     });
 
     multiSubmitBtn?.addEventListener("click", () => {
-      submitMultiplayerAnswer().catch(() => {
+      submitMultiplayerAnswer().catch((error) => {
+        setLastFirebaseError(error);
         if (multiRoundStatus) {
           multiRoundStatus.textContent = "정답을 제출할 수 없습니다. 잠시 후 다시 시도해주세요.";
           multiRoundStatus.className = "feedback-text wrong";
@@ -1143,7 +1223,8 @@
 
     multiAnswerInput?.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
-        submitMultiplayerAnswer().catch(() => {
+        submitMultiplayerAnswer().catch((error) => {
+          setLastFirebaseError(error);
           if (multiRoundStatus) {
             multiRoundStatus.textContent = "정답을 제출할 수 없습니다. 잠시 후 다시 시도해주세요.";
             multiRoundStatus.className = "feedback-text wrong";
@@ -1153,7 +1234,8 @@
     });
 
     multiNextBtn?.addEventListener("click", () => {
-      goNextMultiplayerQuestion().catch(() => {
+      goNextMultiplayerQuestion().catch((error) => {
+        setLastFirebaseError(error);
         if (multiRoundStatus) {
           multiRoundStatus.textContent = "다음 문제로 이동할 수 없습니다. 잠시 후 다시 시도해주세요.";
           multiRoundStatus.className = "feedback-text wrong";
@@ -1162,13 +1244,15 @@
     });
 
     multiCategorySelect?.addEventListener("change", () => {
-      updateRoomCategory().catch(() => {
+      updateRoomCategory().catch((error) => {
+        setLastFirebaseError(error);
         setRoomStatus("카테고리를 변경할 수 없습니다. 잠시 후 다시 시도해주세요.");
       });
     });
 
     multiDifficultySelect?.addEventListener("change", () => {
-      updateRoomDifficulty().catch(() => {
+      updateRoomDifficulty().catch((error) => {
+        setLastFirebaseError(error);
         setRoomStatus("난이도를 변경할 수 없습니다. 잠시 후 다시 시도해주세요.");
       });
     });
@@ -1176,6 +1260,7 @@
 
   populateCategorySelect();
   populateDifficultySelect();
+  updateDebugPanel();
   if (applyRoomCodeFromUrl(true)) {
     showScreenSafe("multiplayer-menu-screen");
   }

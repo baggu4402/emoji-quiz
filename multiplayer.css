@@ -194,6 +194,57 @@ button:disabled {
   opacity: 0.68;
 }
 
+.debug-panel {
+  position: fixed;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 20;
+  width: min(280px, calc(100vw - 20px));
+  color: var(--text);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.debug-toggle-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(35, 31, 32, 0.82);
+  color: white;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 8px 22px rgba(35, 31, 32, 0.2);
+  pointer-events: auto;
+}
+
+.debug-content {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid rgba(35, 31, 32, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+}
+
+.debug-panel.collapsed .debug-content {
+  display: none;
+}
+
+.debug-content p {
+  margin: 0 0 6px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.debug-content p:last-child {
+  margin-bottom: 0;
+}
+
+.debug-content strong {
+  color: var(--muted);
+}
+
 .status-text.success {
   color: var(--success);
 }
