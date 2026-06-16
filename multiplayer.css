@@ -108,6 +108,16 @@
   color: var(--danger);
 }
 
+.multi-play-layout {
+  position: relative;
+  width: 100%;
+}
+
+.multi-main-column {
+  width: min(100%, 480px);
+  margin: 0 auto;
+}
+
 #multi-quiz-screen .hint-text {
   margin: 10px 0 0;
   padding: 10px 12px;
@@ -119,7 +129,6 @@
 }
 
 .player-panel,
-.wrong-feed,
 .scoreboard,
 .leaderboard {
   margin-top: 16px;
@@ -129,7 +138,22 @@
 }
 
 .wrong-feed {
+  padding: 16px;
   border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+}
+
+.wrong-feed-side {
+  position: fixed;
+  top: 140px;
+  right: max(24px, calc((100vw - 1100px) / 2));
+  z-index: 20;
+  width: 300px;
+  max-height: calc(100vh - 190px);
+  overflow: hidden;
 }
 
 .scoreboard {
@@ -154,18 +178,17 @@
   display: grid;
   gap: 8px;
   margin-top: 12px;
-  max-height: 190px;
+  max-height: 360px;
   overflow-y: auto;
 }
 
 .wrong-answer-row {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  align-items: center;
-  gap: 10px;
+  gap: 4px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: white;
+  border: 1px solid rgba(241, 216, 196, 0.8);
+  background: #fffaf4;
   font-weight: 800;
 }
 
@@ -175,6 +198,7 @@
 
 .wrong-answer-name {
   color: var(--muted);
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -354,5 +378,15 @@ button:disabled {
   .wrong-answer-row {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+}
+
+@media (max-width: 900px) {
+  .wrong-feed-side {
+    display: none;
+  }
+
+  .multi-main-column {
+    width: 100%;
   }
 }

@@ -697,6 +697,7 @@
         <span class="wrong-answer-text">${escapeHtml(entry.answer || "")}</span>
       </div>
     `).join("");
+    multiWrongAnswerList.scrollTop = multiWrongAnswerList.scrollHeight;
   }
 
   function renderMultiplayerResult(players = {}) {
