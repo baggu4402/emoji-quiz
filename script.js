@@ -2444,7 +2444,9 @@ const categoryLabel = document.querySelector("#category-label");
 const difficultyLabel = document.querySelector("#difficulty-label");
 const questionCount = document.querySelector("#question-count");
 const scoreText = document.querySelector("#score-text");
+const soloQuizCard = document.querySelector("#quiz-screen .quiz-card");
 const emojiText = document.querySelector("#emoji-text");
+const soloCorrectBurst = document.querySelector("#solo-correct-burst");
 const feedbackText = document.querySelector("#feedback-text");
 const hintText = document.querySelector("#hint-text");
 const answerInput = document.querySelector("#answer-input");
@@ -2499,6 +2501,86 @@ async function copyTextToClipboardForSolo(text) {
     throw new Error("Fallback copy failed");
   }
 }
+
+function replayAnimation(element, className) {
+  if (!element) return;
+
+  element.classList.remove(className);
+  void element.offsetWidth;
+  element.classList.add(className);
+}
+
+function showTemporaryElement(element, duration = 700) {
+  if (!element) return;
+
+  element.classList.remove("hidden");
+  window.setTimeout(() => {
+    element.classList.add("hidden");
+  }, duration);
+}
+
+function vibrateFeedback(pattern) {
+  if (!navigator.vibrate) return;
+
+  try {
+    navigator.vibrate(pattern);
+  } catch (error) {
+    console.warn("Vibration feedback failed:", error);
+  }
+}
+
+function playFeedbackSound(type) {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+
+    const context = new AudioContext();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const now = context.currentTime;
+
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.type = type === "correct" ? "sine" : "triangle";
+
+    if (type === "correct") {
+      oscillator.frequency.setValueAtTime(660, now);
+      oscillator.frequency.setValueAtTime(880, now + 0.08);
+    } else {
+      oscillator.frequency.setValueAtTime(180, now);
+      oscillator.frequency.setValueAtTime(120, now + 0.08);
+    }
+
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.18);
+    window.setTimeout(() => context.close().catch(() => null), 260);
+  } catch (error) {
+    console.warn("Feedback sound failed:", error);
+  }
+}
+
+function playCorrectFeedback(cardElement, burstElement) {
+  replayAnimation(cardElement, "feedback-pop");
+  showTemporaryElement(burstElement, 700);
+  playFeedbackSound("correct");
+  vibrateFeedback(40);
+}
+
+function playWrongFeedback(inputElement) {
+  replayAnimation(inputElement, "answer-shake");
+  playFeedbackSound("wrong");
+  vibrateFeedback([30, 40, 30]);
+}
+
+window.replayAnimation = replayAnimation;
+window.showTemporaryElement = showTemporaryElement;
+window.playFeedbackSound = playFeedbackSound;
+window.vibrateFeedback = vibrateFeedback;
+window.playCorrectFeedback = playCorrectFeedback;
+window.playWrongFeedback = playWrongFeedback;
 
 function getSoloShareText() {
   return [
@@ -2775,6 +2857,9 @@ function renderQuestion() {
   emojiText.textContent = currentQuestion.emoji;
   feedbackText.textContent = "";
   feedbackText.className = "feedback-text";
+  soloQuizCard?.classList.remove("feedback-pop");
+  answerInput.classList.remove("answer-shake");
+  soloCorrectBurst?.classList.add("hidden");
   hintText.textContent = "";
   hintText.classList.add("hidden");
   answerInput.value = "";
@@ -2801,6 +2886,7 @@ function finishCurrentQuestion(isCorrect) {
     scoreText.textContent = score;
     feedbackText.textContent = `정답! +${earnedScore}점`;
     feedbackText.className = "feedback-text correct";
+    playCorrectFeedback(soloQuizCard, soloCorrectBurst);
   } else {
     wrongCount += 1;
   }
@@ -2827,6 +2913,7 @@ function submitAnswer() {
 
   feedbackText.textContent = "아쉽습니다. 다시 생각해보세요!";
   feedbackText.className = "feedback-text wrong";
+  playWrongFeedback(answerInput);
   answerInput.select();
 }
 

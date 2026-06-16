@@ -21,6 +21,7 @@
   let lastResultPlayers = {};
   let lastFirebaseError = "";
   let lastRoomStatus = "-";
+  let lastCelebratedRoundKey = "";
 
   const multiplayerOpenBtn = document.querySelector("#multiplayer-open-btn");
   const createRoomBtn = document.querySelector("#create-room-btn");
@@ -48,7 +49,9 @@
   const multiQuestionCount = document.querySelector("#multi-question-count");
   const multiTimerText = document.querySelector("#multi-timer-text");
   const multiMyScore = document.querySelector("#multi-my-score");
+  const multiQuizCard = document.querySelector("#multi-quiz-screen .quiz-card");
   const multiEmojiText = document.querySelector("#multi-emoji-text");
+  const multiCorrectBurst = document.querySelector("#multi-correct-burst");
   const multiRoundStatus = document.querySelector("#multi-round-status");
   const multiAnswerInput = document.querySelector("#multi-answer-input");
   const multiSubmitBtn = document.querySelector("#multi-submit-btn");
@@ -291,6 +294,51 @@
   function setText(element, text) {
     if (element) {
       element.textContent = text;
+    }
+  }
+
+  function playMultiplayerWrongFeedback() {
+    if (typeof window.playWrongFeedback === "function") {
+      window.playWrongFeedback(multiAnswerInput);
+      return;
+    }
+
+    if (typeof window.replayAnimation === "function") {
+      window.replayAnimation(multiAnswerInput, "answer-shake");
+    }
+    if (typeof window.playFeedbackSound === "function") {
+      window.playFeedbackSound("wrong");
+    }
+    if (typeof window.vibrateFeedback === "function") {
+      window.vibrateFeedback([30, 40, 30]);
+    }
+  }
+
+  function playMultiplayerCorrectFeedback(room, currentRound = room?.currentRound || {}) {
+    if (!currentRound?.winnerId || currentRound.winnerId !== currentPlayerId) return;
+
+    const roundIndex = currentRound.index ?? room?.currentQuestionIndex ?? 0;
+    const roundKey = `${currentRoomCode}_${roundIndex}_${currentRound.winnerId}`;
+    if (lastCelebratedRoundKey === roundKey) return;
+
+    lastCelebratedRoundKey = roundKey;
+
+    if (typeof window.playCorrectFeedback === "function") {
+      window.playCorrectFeedback(multiQuizCard, multiCorrectBurst);
+      return;
+    }
+
+    if (typeof window.replayAnimation === "function") {
+      window.replayAnimation(multiQuizCard, "feedback-pop");
+    }
+    if (typeof window.showTemporaryElement === "function") {
+      window.showTemporaryElement(multiCorrectBurst, 700);
+    }
+    if (typeof window.playFeedbackSound === "function") {
+      window.playFeedbackSound("correct");
+    }
+    if (typeof window.vibrateFeedback === "function") {
+      window.vibrateFeedback(40);
     }
   }
 
@@ -729,6 +777,9 @@
     if (multiAnswerInput.dataset.roundIndex !== String(roundIndex)) {
       multiAnswerInput.value = "";
       multiAnswerInput.dataset.roundIndex = String(roundIndex);
+      multiQuizCard?.classList.remove("feedback-pop");
+      multiAnswerInput.classList.remove("answer-shake");
+      multiCorrectBurst?.classList.add("hidden");
     }
   }
 
@@ -789,6 +840,10 @@
       }
     }
 
+    if (hasWinner) {
+      playMultiplayerCorrectFeedback(room, currentRound);
+    }
+
     if (multiNextBtn) {
       const isLastQuestion = currentIndex >= questionTotal - 1;
       multiNextBtn.textContent = isLastQuestion ? "결과 보기" : "다음 문제";
@@ -815,6 +870,7 @@
       currentRoomCode = "";
       isHost = false;
       lastRoomStatus = "-";
+      lastCelebratedRoundKey = "";
       roomRef = null;
       updateDebugPanel(null);
       renderPlayers({});
@@ -857,6 +913,7 @@
 
   function enterRoomScreen(roomCode) {
     currentRoomCode = roomCode;
+    lastCelebratedRoundKey = "";
     setText(roomCodeDisplay, roomCode);
     setRoomStatus("");
     updateDebugPanel();
@@ -1092,6 +1149,7 @@
     currentRoomCode = "";
     isHost = false;
     lastRoomStatus = "-";
+    lastCelebratedRoundKey = "";
     roomRef = null;
     latestRoom = null;
     updateDebugPanel(null);
@@ -1176,6 +1234,7 @@
         multiRoundStatus.textContent = "오답입니다. 다시 시도하세요.";
         multiRoundStatus.className = "feedback-text wrong";
       }
+      playMultiplayerWrongFeedback();
       multiAnswerInput.select();
       return;
     }
@@ -1199,6 +1258,7 @@
     const isWinner = transactionResult.committed && updatedRound?.winnerId === currentPlayerId;
 
     if (isWinner) {
+      playMultiplayerCorrectFeedback(room, updatedRound);
       await db.ref(`rooms/${currentRoomCode}/players/${currentPlayerId}/score`).transaction((score) => (
         (score || 0) + 10
       ));
