@@ -1,0 +1,94 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$roomCode": {
+        ".read": "auth != null && $roomCode.matches(/^[A-Z2-9]{4}$/)",
+        ".write": "auth != null && $roomCode.matches(/^[A-Z2-9]{4}$/) && ((!data.exists() && newData.exists() && newData.child('code').val() === $roomCode && newData.child('hostId').val() === auth.uid && newData.child('players').child(auth.uid).child('id').val() === auth.uid) || (data.exists() && !newData.exists() && data.child('hostId').val() === auth.uid))",
+        ".validate": "!newData.exists() || (newData.hasChildren(['code', 'status', 'hostId', 'createdAt', 'players']) && newData.child('code').val() === $roomCode)",
+        "code": {
+          ".validate": "newData.isString() && newData.val() === $roomCode"
+        },
+        "status": {
+          ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
+          ".validate": "newData.isString() && (newData.val() === 'waiting' || newData.val() === 'playing' || newData.val() === 'finished')"
+        },
+        "hostId": {
+          ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 128"
+        },
+        "category": {
+          ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
+          ".validate": "newData.isString() && (newData.val() === 'random' || newData.val() === 'movie' || newData.val() === 'game' || newData.val() === 'anime' || newData.val() === 'school')"
+        },
+        "difficulty": {
+          ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
+          ".validate": "newData.isString() && (newData.val() === 'all' || newData.val() === 'easy' || newData.val() === 'normal' || newData.val() === 'hard')"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber() && newData.val() > 0"
+        },
+        "currentQuestionIndex": {
+          ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 500"
+        },
+        "questionIndexes": {
+          ".write": "auth != null && data.parent().child('hostId').val() === auth.uid",
+          "$index": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 1000"
+          }
+        },
+        "currentRound": {
+          ".write": "auth != null && data.parent().child('players').child(auth.uid).exists()",
+          ".validate": "!newData.exists() || newData.hasChildren(['index', 'startedAt', 'timeLimitSeconds', 'isTimeOver'])",
+          "index": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 500"
+          },
+          "winnerId": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)"
+          },
+          "winnerName": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 10)"
+          },
+          "answer": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 80)"
+          },
+          "answeredAt": {
+            ".validate": "!newData.exists() || (newData.isNumber() && newData.val() > 0)"
+          },
+          "startedAt": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          },
+          "timeLimitSeconds": {
+            ".validate": "newData.isNumber() && newData.val() >= 5 && newData.val() <= 120"
+          },
+          "isTimeOver": {
+            ".validate": "newData.isBoolean()"
+          }
+        },
+        "players": {
+          "$playerId": {
+            ".write": "auth != null && ($playerId === auth.uid || data.parent().parent().child('hostId').val() === auth.uid)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['id', 'name', 'score', 'isHost', 'joinedAt']) && newData.child('id').val() === $playerId)",
+            "id": {
+              ".validate": "newData.isString() && newData.val() === $playerId"
+            },
+            "name": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 10"
+            },
+            "score": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9999"
+            },
+            "isHost": {
+              ".validate": "newData.isBoolean()"
+            },
+            "joinedAt": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            }
+          }
+        }
+      }
+    }
+  }
+}

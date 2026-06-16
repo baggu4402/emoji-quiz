@@ -74,6 +74,24 @@ Firebase 콘솔에서:
 
 Anonymous Auth를 켜지 않으면 멀티플레이 방 만들기/참가가 실패할 수 있습니다.
 
+## Realtime Database Rules 설정
+
+멀티플레이 보안을 위해 Firebase Anonymous Auth 기반 Rules를 사용합니다.
+
+Firebase 콘솔에서:
+
+1. Realtime Database
+2. Rules 탭
+3. `database.rules.json` 내용을 복사
+4. Rules 편집기에 붙여넣기
+5. 게시
+
+주의:
+
+- Anonymous Auth가 꺼져 있으면 멀티플레이 write가 거부됩니다.
+- Firebase Console > Authentication > Sign-in method > Anonymous를 반드시 활성화해야 합니다.
+- Rules 적용 후 `PERMISSION_DENIED`가 나면 브라우저를 새로고침한 뒤 다시 로그인 상태를 확인합니다.
+
 ## 멀티플레이 초대 방법
 
 1. 방장이 방을 만든다.
