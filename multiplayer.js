@@ -7,7 +7,7 @@
   const ROUND_TIME_LIMIT_SECONDS = 20;
   const DEFAULT_QUESTION_LIMIT = 10;
   const HINT_REVEAL_SECONDS = 5;
-  const AUTO_NEXT_DELAY_MS = 2000;
+  const AUTO_NEXT_DELAY_MS = 3000;
   const MAX_ROOM_PLAYERS = 6;
 
   let db = null;
@@ -937,9 +937,6 @@
     const hasWinner = Boolean(currentRound.winnerId);
     const isTimeOver = Boolean(currentRound.isTimeOver);
     const roundEnded = hasWinner || isTimeOver;
-    const autoAdvanceText = currentIndex >= questionTotal - 1
-      ? "2초 후 결과로 넘어갑니다."
-      : "2초 후 다음 문제로 넘어갑니다.";
     const actualCategoryName = typeof getCategoryName === "function"
       ? getCategoryName(question?.category)
       : question?.category || "랜덤";
@@ -990,10 +987,10 @@
         const winnerMessage = currentRound.hintShown
           ? `${currentRound.winnerName || "누군가"}님이 힌트 후 맞혔습니다! +5점`
           : `${currentRound.winnerName || "누군가"}님이 먼저 맞혔습니다! +${pointsAwarded}점`;
-        multiRoundStatus.textContent = `${winnerMessage} 정답: ${currentRound.answer || ""} · ${autoAdvanceText}`;
+        multiRoundStatus.textContent = `${winnerMessage} 정답: ${currentRound.answer || ""}`;
         multiRoundStatus.className = "feedback-text correct";
       } else if (isTimeOver) {
-        multiRoundStatus.textContent = `시간 초과! 정답: ${currentRound.answer || question?.answers?.[0] || ""} · ${autoAdvanceText}`;
+        multiRoundStatus.textContent = `시간 초과! 정답: ${currentRound.answer || question?.answers?.[0] || ""}`;
         multiRoundStatus.className = "feedback-text wrong";
       } else {
         multiRoundStatus.textContent = currentRound.hintShown ? "힌트 공개 후 맞히면 +5점" : roundReadyMessage;
