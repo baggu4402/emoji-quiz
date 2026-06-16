@@ -1,3 +1,4 @@
+const APP_VERSION = "v0.9.0-beta";
 const QUESTION_LIMIT = 10;
 const BEST_SCORE_KEY = "emojiQuizBestScore";
 
@@ -2437,6 +2438,7 @@ let previousSoloScreen = "home-screen";
 
 const screens = document.querySelectorAll(".screen");
 const homeBestScore = document.querySelector("#home-best-score");
+const appVersionText = document.querySelector("#app-version-text");
 const soloDifficultyList = document.querySelector("#solo-difficulty-list");
 const categoryList = document.querySelector("#category-list");
 const categoryStatusText = document.querySelector("#category-status-text");
@@ -2458,6 +2460,8 @@ const soloBackBtn = document.querySelector("#solo-back-btn");
 const shareSoloResultBtn = document.querySelector("#share-solo-result-btn");
 const copyBugReportBtn = document.querySelector("#copy-bug-report-btn");
 const bugReportStatus = document.querySelector("#bug-report-status");
+const updateAppBtn = document.querySelector("#update-app-btn");
+const updateStatusText = document.querySelector("#update-status-text");
 const finalScore = document.querySelector("#final-score");
 const bestMessage = document.querySelector("#best-message");
 const correctCountText = document.querySelector("#correct-count");
@@ -2499,6 +2503,31 @@ async function copyTextToClipboardForSolo(text) {
 
   if (!copyTextWithFallback(text)) {
     throw new Error("Fallback copy failed");
+  }
+}
+
+function updateVersionUI() {
+  if (appVersionText) {
+    appVersionText.textContent = APP_VERSION;
+  }
+}
+
+async function refreshAppCache() {
+  try {
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+
+    if ("caches" in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+    }
+
+    window.location.reload(true);
+  } catch (error) {
+    console.warn("Failed to refresh app cache:", error);
+    window.location.reload();
   }
 }
 
@@ -2976,6 +3005,14 @@ function bindEvents() {
   document.querySelector("#home-btn").addEventListener("click", () => showScreen("home-screen"));
   shareSoloResultBtn?.addEventListener("click", shareSoloResult);
   copyBugReportBtn?.addEventListener("click", copyBugReport);
+  updateAppBtn?.addEventListener("click", async () => {
+    if (updateStatusText) {
+      updateStatusText.textContent = "업데이트 중입니다...";
+      updateStatusText.className = "status-text";
+    }
+
+    await refreshAppCache();
+  });
   if (soloBackBtn) {
     soloBackBtn.addEventListener("click", () => showScreen(previousSoloScreen || "home-screen"));
   }
@@ -3001,6 +3038,7 @@ function bindEvents() {
 }
 
 function init() {
+  updateVersionUI();
   updateBestScoreUI();
   buildSoloDifficultyButtons();
   buildCategoryButtons();

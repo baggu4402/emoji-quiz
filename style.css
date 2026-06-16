@@ -153,6 +153,14 @@ h2 {
   gap: 12px;
 }
 
+.version-text {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
 .difficulty-selector {
   margin-top: 18px;
   padding: 16px;
@@ -505,6 +513,26 @@ h2 {
 
 .test-guide-card {
   margin-top: 16px;
+}
+
+.update-guide-card {
+  margin-top: 16px;
+}
+
+.update-guide-card h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.update-guide-card #update-app-btn {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.update-guide-card .status-text {
+  min-height: 22px;
+  margin: 10px 0 0;
+  text-align: center;
 }
 
 .test-guide-card h3 {
