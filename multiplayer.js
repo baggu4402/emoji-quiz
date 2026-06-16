@@ -22,6 +22,8 @@
   const playerNameInput = document.querySelector("#player-name-input");
   const roomCodeInput = document.querySelector("#room-code-input");
   const roomCodeDisplay = document.querySelector("#room-code-display");
+  const copyRoomCodeBtn = document.querySelector("#copy-room-code-btn");
+  const copyInviteLinkBtn = document.querySelector("#copy-invite-link-btn");
   const playerList = document.querySelector("#player-list");
   const playerCountText = document.querySelector("#player-count-text");
   const roomStatusText = document.querySelector("#room-status-text");
@@ -68,12 +70,20 @@
     }
   }
 
-  function setMenuStatus(text) {
-    setText(multiMenuStatus, text);
+  function setStatusMessage(element, text, type = "") {
+    if (!element) return;
+
+    element.textContent = text;
+    element.classList.toggle("success", type === "success");
+    element.classList.toggle("error", type === "error");
   }
 
-  function setRoomStatus(text) {
-    setText(roomStatusText, text);
+  function setMenuStatus(text, type = "") {
+    setStatusMessage(multiMenuStatus, text, type);
+  }
+
+  function setRoomStatus(text, type = "") {
+    setStatusMessage(roomStatusText, text, type);
   }
 
   function showScreenSafe(screenId) {
@@ -133,6 +143,61 @@
 
   function getRoomCodeInput() {
     return roomCodeInput?.value.trim().toUpperCase() || "";
+  }
+
+  function getRoomCodeFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return (params.get("room") || "").trim().toUpperCase();
+  }
+
+  function applyRoomCodeFromUrl(showMessage = false) {
+    const roomCode = getRoomCodeFromUrl();
+
+    if (!roomCode || !roomCodeInput) return false;
+
+    roomCodeInput.value = roomCode;
+
+    if (showMessage) {
+      setMenuStatus("초대 링크의 방 코드가 입력되었습니다. 닉네임을 입력하고 참가하세요.", "success");
+    }
+
+    return true;
+  }
+
+  function getInviteLink(roomCode) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("room", roomCode);
+    return url.toString();
+  }
+
+  function copyTextWithFallback(text) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    try {
+      return document.execCommand("copy");
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  }
+
+  async function copyTextToClipboard(text, successMessage) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else if (!copyTextWithFallback(text)) {
+        throw new Error("Fallback copy failed");
+      }
+
+      setRoomStatus(successMessage, "success");
+    } catch (error) {
+      setRoomStatus("복사에 실패했습니다. 직접 선택해서 복사해주세요.", "error");
+    }
   }
 
   function getSelectedCategory() {
@@ -480,6 +545,26 @@
     return createRoomCode();
   }
 
+  async function cleanupOldRooms() {
+    if (!db) return;
+
+    const sixHours = 6 * 60 * 60 * 1000;
+    const cutoff = Date.now() - sixHours;
+    const snapshot = await db.ref("rooms").once("value");
+    const rooms = snapshot.val() || {};
+    const updates = {};
+
+    Object.entries(rooms).forEach(([roomCode, room]) => {
+      if (room.createdAt && room.createdAt < cutoff) {
+        updates[`rooms/${roomCode}`] = null;
+      }
+    });
+
+    if (Object.keys(updates).length > 0) {
+      await db.ref().update(updates);
+    }
+  }
+
   async function createRoom() {
     currentPlayerName = getPlayerName();
 
@@ -494,6 +579,13 @@
     }
 
     currentPlayerId = getOrCreatePlayerId();
+
+    try {
+      await cleanupOldRooms();
+    } catch (error) {
+      console.warn("Failed to cleanup old rooms", error);
+    }
+
     const roomCode = await findAvailableRoomCode();
     const now = Date.now();
     const category = getSelectedCategory();
@@ -719,8 +811,28 @@
 
   function bindEvents() {
     multiplayerOpenBtn?.addEventListener("click", () => {
-      setMenuStatus("");
+      if (!applyRoomCodeFromUrl(true)) {
+        setMenuStatus("");
+      }
       showScreenSafe("multiplayer-menu-screen");
+    });
+
+    copyRoomCodeBtn?.addEventListener("click", () => {
+      if (!currentRoomCode) {
+        setRoomStatus("복사할 방 코드가 없습니다.", "error");
+        return;
+      }
+
+      copyTextToClipboard(currentRoomCode, "방 코드가 복사되었습니다.");
+    });
+
+    copyInviteLinkBtn?.addEventListener("click", () => {
+      if (!currentRoomCode) {
+        setRoomStatus("복사할 초대 링크가 없습니다.", "error");
+        return;
+      }
+
+      copyTextToClipboard(getInviteLink(currentRoomCode), "초대 링크가 복사되었습니다.");
     });
 
     createRoomBtn?.addEventListener("click", () => {
@@ -796,6 +908,9 @@
   }
 
   populateCategorySelect();
+  if (applyRoomCodeFromUrl(true)) {
+    showScreenSafe("multiplayer-menu-screen");
+  }
   updateHostControls();
   bindEvents();
 })();

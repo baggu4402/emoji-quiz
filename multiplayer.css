@@ -63,6 +63,20 @@
   letter-spacing: 0.12em;
 }
 
+.room-share-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.room-share-actions .secondary-btn,
+.room-share-actions .ghost-btn {
+  min-height: 48px;
+  border-radius: 16px;
+  font-size: 14px;
+}
+
 .timer-text {
   margin: 8px 0 0;
   color: var(--muted);
@@ -157,4 +171,18 @@ button:disabled {
   cursor: not-allowed;
   filter: grayscale(0.3);
   opacity: 0.68;
+}
+
+.status-text.success {
+  color: var(--success);
+}
+
+.status-text.error {
+  color: var(--danger);
+}
+
+@media (max-width: 360px) {
+  .room-share-actions {
+    grid-template-columns: 1fr;
+  }
 }
