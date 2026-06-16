@@ -92,8 +92,6 @@ const hintBtn = document.querySelector("#hint-btn");
 const showAnswerBtn = document.querySelector("#show-answer-btn");
 const nextBtn = document.querySelector("#next-btn");
 const soloBackBtn = document.querySelector("#solo-back-btn");
-const multiplayerOpenBtn = document.querySelector("#multiplayer-open-btn");
-const multiMenuStatus = document.querySelector("#multi-menu-status");
 const finalScore = document.querySelector("#final-score");
 const bestMessage = document.querySelector("#best-message");
 const correctCountText = document.querySelector("#correct-count");
@@ -102,32 +100,6 @@ const wrongCountText = document.querySelector("#wrong-count");
 function showScreen(screenId) {
   screens.forEach((screen) => screen.classList.remove("active"));
   document.querySelector(`#${screenId}`).classList.add("active");
-}
-
-function isFirebaseReady() {
-  return Boolean(
-    window.firebaseConfig &&
-    window.firebase &&
-    typeof window.firebase.initializeApp === "function" &&
-    typeof window.firebase.database === "function"
-  );
-}
-
-function showMultiplayerUnavailable() {
-  showScreen("multiplayer-menu-screen");
-
-  if (multiMenuStatus) {
-    multiMenuStatus.textContent = "멀티플레이는 Firebase 설정 후 사용할 수 있습니다.";
-  }
-}
-
-function openMultiplayerMenu() {
-  if (!isFirebaseReady()) {
-    showMultiplayerUnavailable();
-    return;
-  }
-
-  showScreen("multiplayer-menu-screen");
 }
 
 function getBestScore() {
@@ -303,9 +275,6 @@ function showResult() {
 
 function bindEvents() {
   document.querySelector("#quick-start-btn").addEventListener("click", () => startGame("random", "home-screen"));
-  if (multiplayerOpenBtn) {
-    multiplayerOpenBtn.addEventListener("click", openMultiplayerMenu);
-  }
   document.querySelector("#category-open-btn").addEventListener("click", () => showScreen("category-screen"));
   document.querySelector("#how-to-btn").addEventListener("click", () => showScreen("how-to-screen"));
   document.querySelector("#retry-btn").addEventListener("click", () => startGame(selectedCategory));

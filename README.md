@@ -34,3 +34,17 @@ emoji-quiz/
 ## 배포
 
 GitHub Pages에 올리면 무료 웹게임으로 바로 배포할 수 있습니다.
+
+## Firebase 멀티플레이 설정
+
+1. Firebase 콘솔에서 프로젝트 생성
+2. Realtime Database 생성
+3. 앱 추가
+4. Firebase SDK 설정값 복사
+5. `firebase-config.example.js`를 복사해서 `firebase-config.js` 생성
+6. `firebase-config.js` 안의 값을 본인 프로젝트 값으로 교체
+7. GitHub Pages에 배포 후 친구와 방 코드로 테스트
+
+주의:
+현재 멀티플레이는 Firebase 설정이 있어야 동작합니다.
+Firebase 설정이 없어도 싱글 플레이는 정상 작동해야 합니다.

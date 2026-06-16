@@ -78,3 +78,52 @@
   justify-content: space-between;
   gap: 12px;
 }
+
+.player-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.player-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: white;
+  font-weight: 800;
+}
+
+.player-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-score {
+  color: var(--muted);
+}
+
+.host-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--secondary);
+  color: #713815;
+  font-size: 12px;
+}
+
+.empty-player {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+  text-align: center;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+  opacity: 0.68;
+}
