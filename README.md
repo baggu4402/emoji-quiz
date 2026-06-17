@@ -249,6 +249,7 @@ https://baggu4402.github.io/emoji-quiz/?room=ABCD
 - 싱글 플레이 결과 공유 가능
 - 멀티플레이 최종 순위 공유 가능
 - 공유 버튼은 결과 문구를 클립보드에 복사함
+- 공유 링크는 Open Graph / Twitter Card 미리보기 이미지와 설명을 제공한다.
 
 ## 피드백 효과
 
