@@ -75,6 +75,11 @@
         <button id="show-answer-btn" class="ghost-btn">정답 보기</button>
         <button id="next-btn" class="primary-btn hidden">다음 문제</button>
       </div>
+      <div class="feedback-actions">
+        <button id="solo-answer-request-btn" class="ghost-btn" type="button">이 답도 맞는 것 같아요</button>
+        <button id="solo-question-report-btn" class="ghost-btn" type="button">문제 신고</button>
+      </div>
+      <p id="solo-feedback-status" class="status-text"></p>
     </section>
 
     <section id="result-screen" class="screen">
@@ -216,6 +221,11 @@
           <button id="multi-next-btn" class="secondary-btn hidden">다음 문제</button>
           <button id="multi-leave-btn" class="ghost-btn">방 나가기</button>
         </div>
+        <div class="feedback-actions multi-feedback-actions">
+          <button id="multi-answer-request-btn" class="ghost-btn" type="button">이 답도 맞는 것 같아요</button>
+          <button id="multi-question-report-btn" class="ghost-btn" type="button">문제 신고</button>
+        </div>
+        <p id="multi-feedback-status" class="status-text"></p>
       </div>
 
       <aside id="wrong-feed-panel" class="wrong-feed-panel">

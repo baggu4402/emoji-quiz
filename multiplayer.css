@@ -18,6 +18,15 @@
   margin-top: 12px;
 }
 
+.multi-feedback-actions {
+  margin-top: 10px;
+}
+
+.multi-feedback-actions .ghost-btn {
+  min-height: 40px;
+  font-size: 12px;
+}
+
 .divider {
   display: flex;
   align-items: center;

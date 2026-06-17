@@ -140,6 +140,52 @@
           }
         }
       }
+    },
+    "feedbacks": {
+      ".read": false,
+      "$feedbackId": {
+        ".write": "auth != null && !data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['type', 'mode', 'createdAt'])",
+        "type": {
+          ".validate": "newData.isString() && (newData.val() === 'answer_request' || newData.val() === 'question_report')"
+        },
+        "mode": {
+          ".validate": "newData.isString() && (newData.val() === 'solo' || newData.val() === 'multi')"
+        },
+        "roomCode": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 16)"
+        },
+        "questionId": {
+          ".validate": "!newData.exists() || newData.isNumber()"
+        },
+        "category": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 40)"
+        },
+        "emoji": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 80)"
+        },
+        "correctAnswer": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 100)"
+        },
+        "submittedAnswer": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 50)"
+        },
+        "message": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 200)"
+        },
+        "playerName": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 20)"
+        },
+        "playerId": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber() && newData.val() > 0"
+        },
+        "url": {
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 300)"
+        }
+      }
     }
   }
 }

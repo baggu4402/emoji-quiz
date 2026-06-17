@@ -153,6 +153,20 @@ h2 {
   gap: 12px;
 }
 
+.feedback-actions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.feedback-actions .ghost-btn {
+  min-height: 42px;
+  padding: 0 10px;
+  border-radius: 14px;
+  font-size: 13px;
+}
+
 .version-text {
   margin: 16px 0 0;
   color: var(--muted);
@@ -625,6 +639,10 @@ h2 {
   }
 
   .result-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .feedback-actions {
     grid-template-columns: 1fr;
   }
 }

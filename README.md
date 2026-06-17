@@ -265,6 +265,18 @@ https://baggu4402.github.io/emoji-quiz/?room=ABCD
 
 설정값은 브라우저 localStorage에 저장되며, 다음 접속 시에도 유지된다.
 
+## 문제 피드백
+
+친구 테스트 중 아래 피드백을 보낼 수 있다.
+
+- 이 답도 맞는 것 같아요
+- 문제 신고
+
+Firebase가 연결되어 있으면 Realtime Database의 `feedbacks` 경로에 저장된다.
+저장에 실패하면 피드백 내용이 클립보드에 복사된다.
+
+피드백은 추후 answers 보강, 힌트 수정, 난이도 조정에 사용한다.
+
 ## 친구 테스트 방법
 
 1. GitHub Pages 링크를 친구에게 공유한다.

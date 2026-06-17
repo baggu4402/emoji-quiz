@@ -3,6 +3,11 @@ const QUESTION_LIMIT = 10;
 const BEST_SCORE_KEY = "emojiQuizBestScore";
 const SOUND_ENABLED_KEY = "emojiQuizSoundEnabled";
 const VIBRATION_ENABLED_KEY = "emojiQuizVibrationEnabled";
+const FEEDBACK_PLAYER_ID_KEY = "emojiQuizPlayerId";
+const FEEDBACK_THROTTLE_MS = 2000;
+
+let soloFeedbackAuthReadyPromise = null;
+let lastSoloFeedbackSubmittedAt = 0;
 
 const categories = [
   { id: "random", name: "랜덤", icon: "🎲" },
@@ -2458,6 +2463,9 @@ const submitBtn = document.querySelector("#submit-btn");
 const hintBtn = document.querySelector("#hint-btn");
 const showAnswerBtn = document.querySelector("#show-answer-btn");
 const nextBtn = document.querySelector("#next-btn");
+const soloAnswerRequestBtn = document.querySelector("#solo-answer-request-btn");
+const soloQuestionReportBtn = document.querySelector("#solo-question-report-btn");
+const soloFeedbackStatus = document.querySelector("#solo-feedback-status");
 const soloBackBtn = document.querySelector("#solo-back-btn");
 const shareSoloResultBtn = document.querySelector("#share-solo-result-btn");
 const copyBugReportBtn = document.querySelector("#copy-bug-report-btn");
@@ -2506,6 +2514,106 @@ async function copyTextToClipboardForSolo(text) {
   if (!copyTextWithFallback(text)) {
     throw new Error("Fallback copy failed");
   }
+}
+
+function getFeedbackTypeText(type) {
+  return type === "answer_request" ? "정답 인정 요청" : "문제 신고";
+}
+
+function getSoloFeedbackPlayerId() {
+  try {
+    const savedId = localStorage.getItem(FEEDBACK_PLAYER_ID_KEY);
+    if (savedId) return savedId;
+
+    const fallbackId = `solo_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    localStorage.setItem(FEEDBACK_PLAYER_ID_KEY, fallbackId);
+    return fallbackId;
+  } catch (error) {
+    return "solo";
+  }
+}
+
+function buildFeedbackText(payload) {
+  return [
+    "이게 뭔데? Emoji Quiz 문제 피드백",
+    "",
+    `유형: ${getFeedbackTypeText(payload.type)}`,
+    `모드: ${payload.mode || "-"}`,
+    `방 코드: ${payload.roomCode || "-"}`,
+    `문제 ID: ${payload.questionId ?? "-"}`,
+    `카테고리: ${payload.category || "-"}`,
+    `이모지: ${payload.emoji || "-"}`,
+    `대표 정답: ${payload.correctAnswer || "-"}`,
+    `입력한 답: ${payload.submittedAnswer || "-"}`,
+    `메시지: ${payload.message || "-"}`,
+    `플레이어: ${payload.playerName || "-"}`,
+    `Player ID: ${payload.playerId || "-"}`,
+    `URL: ${payload.url || "-"}`,
+  ].join("\n");
+}
+
+function isFeedbackFirebaseReady() {
+  return Boolean(
+    window.firebaseConfig &&
+    window.firebase &&
+    typeof window.firebase.initializeApp === "function" &&
+    typeof window.firebase.auth === "function" &&
+    typeof window.firebase.database === "function"
+  );
+}
+
+async function saveSoloFeedbackToFirebase(payload) {
+  if (!isFeedbackFirebaseReady()) {
+    throw new Error("Firebase is not ready");
+  }
+
+  if (!window.firebase.apps.length) {
+    window.firebase.initializeApp(window.firebaseConfig);
+  }
+
+  const auth = window.firebase.auth();
+  const db = window.firebase.database();
+
+  if (!auth.currentUser) {
+    if (!soloFeedbackAuthReadyPromise) {
+      soloFeedbackAuthReadyPromise = auth.signInAnonymously()
+        .catch((error) => {
+          soloFeedbackAuthReadyPromise = null;
+          throw error;
+        });
+    }
+    await soloFeedbackAuthReadyPromise;
+  }
+
+  if (auth.currentUser?.uid) {
+    payload.playerId = auth.currentUser.uid;
+  }
+
+  await db.ref("feedbacks").push(payload);
+}
+
+async function submitFeedbackWithFallback(payload, statusElement) {
+  try {
+    await saveSoloFeedbackToFirebase(payload);
+    setStatusMessage(statusElement, "피드백이 저장되었습니다. 감사합니다.", "success");
+  } catch (error) {
+    console.warn("Feedback save failed, copying fallback text", error);
+    try {
+      await copyTextToClipboardForSolo(buildFeedbackText(payload));
+      setStatusMessage(statusElement, "피드백 내용을 클립보드에 복사했습니다.", "success");
+    } catch (copyError) {
+      console.warn("Feedback fallback copy failed", copyError);
+      setStatusMessage(statusElement, "피드백 저장에 실패했습니다. 버그 리포트 복사를 이용해주세요.", "error");
+    }
+  }
+}
+
+function setStatusMessage(element, text, type = "") {
+  if (!element) return;
+
+  element.textContent = text;
+  element.classList.toggle("success", type === "success");
+  element.classList.toggle("error", type === "error");
 }
 
 function updateVersionUI() {
@@ -2649,6 +2757,59 @@ function initSettingsUI() {
       setVibrationEnabled(vibrationToggle.checked);
     });
   }
+}
+
+function buildSoloFeedbackPayload(type) {
+  const currentQuestion = questions[currentIndex] || {};
+  const submittedAnswer = answerInput?.value?.trim() || "";
+
+  return {
+    type,
+    mode: "solo",
+    roomCode: null,
+    questionId: currentQuestion.id || null,
+    category: currentQuestion.category || "",
+    emoji: currentQuestion.emoji || "",
+    correctAnswer: (currentQuestion.answers?.[0] || "").slice(0, 100),
+    submittedAnswer: submittedAnswer.slice(0, 50),
+    message: type === "answer_request"
+      ? "이 답도 맞는 것 같아요."
+      : "문제에 오류가 있거나 애매합니다.",
+    playerName: "solo",
+    playerId: getSoloFeedbackPlayerId(),
+    createdAt: Date.now(),
+    url: window.location.href.slice(0, 300),
+  };
+}
+
+function setSoloFeedbackButtonsDisabled(disabled) {
+  if (soloAnswerRequestBtn) {
+    soloAnswerRequestBtn.disabled = disabled;
+  }
+  if (soloQuestionReportBtn) {
+    soloQuestionReportBtn.disabled = disabled;
+  }
+}
+
+async function submitSoloFeedback(type) {
+  const now = Date.now();
+  if (now - lastSoloFeedbackSubmittedAt < FEEDBACK_THROTTLE_MS) return;
+
+  if (!questions[currentIndex]) {
+    setStatusMessage(soloFeedbackStatus, "피드백을 보낼 문제가 없습니다.", "error");
+    return;
+  }
+
+  const payload = buildSoloFeedbackPayload(type);
+  if (type === "answer_request" && !payload.submittedAnswer) {
+    setStatusMessage(soloFeedbackStatus, "먼저 인정 요청할 답을 입력해주세요.", "error");
+    return;
+  }
+
+  lastSoloFeedbackSubmittedAt = now;
+  setSoloFeedbackButtonsDisabled(true);
+  await submitFeedbackWithFallback(payload, soloFeedbackStatus);
+  window.setTimeout(() => setSoloFeedbackButtonsDisabled(false), FEEDBACK_THROTTLE_MS);
 }
 
 function getSoloShareText() {
@@ -2926,6 +3087,7 @@ function renderQuestion() {
   emojiText.textContent = currentQuestion.emoji;
   feedbackText.textContent = "";
   feedbackText.className = "feedback-text";
+  setStatusMessage(soloFeedbackStatus, "");
   soloQuizCard?.classList.remove("feedback-pop");
   answerInput.classList.remove("answer-shake");
   soloCorrectBurst?.classList.add("hidden");
@@ -3065,6 +3227,20 @@ function bindEvents() {
   hintBtn.addEventListener("click", showHint);
   showAnswerBtn.addEventListener("click", showAnswer);
   nextBtn.addEventListener("click", goNextQuestion);
+  soloAnswerRequestBtn?.addEventListener("click", () => {
+    submitSoloFeedback("answer_request").catch((error) => {
+      console.warn("Solo feedback submit failed", error);
+      setStatusMessage(soloFeedbackStatus, "피드백 저장에 실패했습니다. 버그 리포트 복사를 이용해주세요.", "error");
+      setSoloFeedbackButtonsDisabled(false);
+    });
+  });
+  soloQuestionReportBtn?.addEventListener("click", () => {
+    submitSoloFeedback("question_report").catch((error) => {
+      console.warn("Solo feedback submit failed", error);
+      setStatusMessage(soloFeedbackStatus, "피드백 저장에 실패했습니다. 버그 리포트 복사를 이용해주세요.", "error");
+      setSoloFeedbackButtonsDisabled(false);
+    });
+  });
 
   answerInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {

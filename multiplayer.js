@@ -14,6 +14,7 @@
   const MAX_ROOM_PLAYERS = 6;
   const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
   const THIRTY_MINUTES_MS = 30 * 60 * 1000;
+  const FEEDBACK_THROTTLE_MS = 2000;
 
   let db = null;
   let auth = null;
@@ -35,6 +36,7 @@
   let lastPresenceMaintenanceAt = 0;
   let isLeavingRoom = false;
   let isClosingRoom = false;
+  let lastFeedbackSubmittedAt = 0;
 
   const multiplayerOpenBtn = document.querySelector("#multiplayer-open-btn");
   const createRoomBtn = document.querySelector("#create-room-btn");
@@ -74,6 +76,9 @@
   const multiAnswerInput = document.querySelector("#multi-answer-input");
   const multiSubmitBtn = document.querySelector("#multi-submit-btn");
   const multiNextBtn = document.querySelector("#multi-next-btn");
+  const multiAnswerRequestBtn = document.querySelector("#multi-answer-request-btn");
+  const multiQuestionReportBtn = document.querySelector("#multi-question-report-btn");
+  const multiFeedbackStatus = document.querySelector("#multi-feedback-status");
   const multiScoreboard = document.querySelector("#multi-scoreboard");
   const multiWrongAnswerList = document.querySelector("#multi-wrong-answer-list");
   const multiResultList = document.querySelector("#multi-result-list");
@@ -596,6 +601,111 @@
       setStatusMessage(multiResultStatus, "결과가 복사되었습니다.", "success");
     } catch (error) {
       setStatusMessage(multiResultStatus, "복사에 실패했습니다. 직접 선택해서 복사해주세요.", "error");
+    }
+  }
+
+  function getFeedbackTypeText(type) {
+    return type === "answer_request" ? "정답 인정 요청" : "문제 신고";
+  }
+
+  function getFeedbackText(payload) {
+    return [
+      "이게 뭔데? Emoji Quiz 문제 피드백",
+      "",
+      `유형: ${getFeedbackTypeText(payload.type)}`,
+      `모드: ${payload.mode || "-"}`,
+      `방 코드: ${payload.roomCode || "-"}`,
+      `문제 ID: ${payload.questionId ?? "-"}`,
+      `카테고리: ${payload.category || "-"}`,
+      `이모지: ${payload.emoji || "-"}`,
+      `대표 정답: ${payload.correctAnswer || "-"}`,
+      `입력한 답: ${payload.submittedAnswer || "-"}`,
+      `메시지: ${payload.message || "-"}`,
+      `플레이어: ${payload.playerName || "-"}`,
+      `Player ID: ${payload.playerId || "-"}`,
+      `URL: ${payload.url || "-"}`,
+    ].join("\n");
+  }
+
+  function buildMultiplayerFeedbackPayload(type) {
+    const room = latestRoom || {};
+    const question = getCurrentQuestion(room) || {};
+    const submittedAnswer = multiAnswerInput?.value?.trim() || "";
+
+    return {
+      type,
+      mode: "multi",
+      roomCode: currentRoomCode || room.code || "",
+      questionId: question.id || null,
+      category: question.category || "",
+      emoji: question.emoji || "",
+      correctAnswer: (question.answers?.[0] || "").slice(0, 100),
+      submittedAnswer: submittedAnswer.slice(0, 50),
+      message: type === "answer_request"
+        ? "이 답도 맞는 것 같아요."
+        : "문제에 오류가 있거나 애매합니다.",
+      playerName: (currentPlayerName || "플레이어").slice(0, 20),
+      playerId: currentPlayerId || "",
+      createdAt: Date.now(),
+      url: window.location.href.slice(0, 300),
+    };
+  }
+
+  async function saveMultiplayerFeedbackToFirebase(payload) {
+    if (!initFirebase()) {
+      throw new Error("Firebase is not ready");
+    }
+
+    await ensureAnonymousAuth();
+    if (auth?.currentUser?.uid) {
+      payload.playerId = auth.currentUser.uid;
+    }
+
+    await db.ref("feedbacks").push(payload);
+  }
+
+  function setMultiplayerFeedbackButtonsDisabled(disabled) {
+    if (multiAnswerRequestBtn) {
+      multiAnswerRequestBtn.disabled = disabled;
+    }
+    if (multiQuestionReportBtn) {
+      multiQuestionReportBtn.disabled = disabled;
+    }
+  }
+
+  async function submitMultiplayerFeedback(type) {
+    const now = Date.now();
+    if (now - lastFeedbackSubmittedAt < FEEDBACK_THROTTLE_MS) return;
+
+    if (!latestRoom || !getCurrentQuestion(latestRoom)) {
+      setStatusMessage(multiFeedbackStatus, "피드백을 보낼 문제가 없습니다.", "error");
+      return;
+    }
+
+    const payload = buildMultiplayerFeedbackPayload(type);
+    if (type === "answer_request" && !payload.submittedAnswer) {
+      setStatusMessage(multiFeedbackStatus, "먼저 인정 요청할 답을 입력해주세요.", "error");
+      return;
+    }
+
+    lastFeedbackSubmittedAt = now;
+    setMultiplayerFeedbackButtonsDisabled(true);
+
+    try {
+      await saveMultiplayerFeedbackToFirebase(payload);
+      setStatusMessage(multiFeedbackStatus, "피드백이 저장되었습니다. 감사합니다.", "success");
+    } catch (error) {
+      console.warn("Multiplayer feedback save failed, copying fallback text", error);
+      setLastFirebaseError(error);
+      try {
+        await writeTextToClipboard(getFeedbackText(payload));
+        setStatusMessage(multiFeedbackStatus, "피드백 내용을 클립보드에 복사했습니다.", "success");
+      } catch (copyError) {
+        console.warn("Multiplayer feedback fallback copy failed", copyError);
+        setStatusMessage(multiFeedbackStatus, "피드백 저장에 실패했습니다. 버그 리포트 복사를 이용해주세요.", "error");
+      }
+    } finally {
+      window.setTimeout(() => setMultiplayerFeedbackButtonsDisabled(false), FEEDBACK_THROTTLE_MS);
     }
   }
 
@@ -1190,6 +1300,7 @@
       multiQuizCard?.classList.remove("feedback-pop");
       multiAnswerInput.classList.remove("answer-shake");
       multiCorrectBurst?.classList.add("hidden");
+      setStatusMessage(multiFeedbackStatus, "");
     }
   }
 
@@ -2127,6 +2238,22 @@
           multiRoundStatus.textContent = "정답을 제출할 수 없습니다. 잠시 후 다시 시도해주세요.";
           multiRoundStatus.className = "feedback-text wrong";
         }
+      });
+    });
+
+    multiAnswerRequestBtn?.addEventListener("click", () => {
+      submitMultiplayerFeedback("answer_request").catch((error) => {
+        setLastFirebaseError(error);
+        setStatusMessage(multiFeedbackStatus, "피드백 저장에 실패했습니다. 버그 리포트 복사를 이용해주세요.", "error");
+        setMultiplayerFeedbackButtonsDisabled(false);
+      });
+    });
+
+    multiQuestionReportBtn?.addEventListener("click", () => {
+      submitMultiplayerFeedback("question_report").catch((error) => {
+        setLastFirebaseError(error);
+        setStatusMessage(multiFeedbackStatus, "피드백 저장에 실패했습니다. 버그 리포트 복사를 이용해주세요.", "error");
+        setMultiplayerFeedbackButtonsDisabled(false);
       });
     });
 
