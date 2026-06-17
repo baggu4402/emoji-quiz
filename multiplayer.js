@@ -8,6 +8,9 @@
   const DEFAULT_QUESTION_LIMIT = 10;
   const HINT_REVEAL_SECONDS = 5;
   const AUTO_NEXT_DELAY_MS = 3000;
+  const PRESENCE_CLEANUP_INTERVAL_MS = 10000;
+  const OFFLINE_CLEANUP_MS = 2 * 60 * 1000;
+  const HOST_TRANSFER_MS = 30 * 1000;
   const MAX_ROOM_PLAYERS = 6;
   const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
   const THIRTY_MINUTES_MS = 30 * 60 * 1000;
@@ -29,6 +32,7 @@
   let lastFirebaseError = "";
   let lastRoomStatus = "-";
   let lastCelebratedRoundKey = "";
+  let lastPresenceMaintenanceAt = 0;
 
   const multiplayerOpenBtn = document.querySelector("#multiplayer-open-btn");
   const createRoomBtn = document.querySelector("#create-room-btn");
@@ -167,6 +171,47 @@
     auth = window.firebase.auth();
     updateDebugPanel();
     return true;
+  }
+
+  function getServerTimestamp() {
+    return window.firebase?.database?.ServerValue?.TIMESTAMP || Date.now();
+  }
+
+  function setupPlayerPresence(roomCode, playerId) {
+    if (!db || !roomCode || !playerId) return;
+
+    const playerRef = db.ref(`rooms/${roomCode}/players/${playerId}`);
+    const timestamp = getServerTimestamp();
+
+    playerRef.update({
+      online: true,
+      disconnectedAt: null,
+      lastSeenAt: timestamp,
+    }).catch((error) => {
+      console.warn("Failed to update player presence", error);
+      setLastFirebaseError(error);
+    });
+
+    playerRef.onDisconnect().update({
+      online: false,
+      ready: false,
+      disconnectedAt: timestamp,
+      lastSeenAt: timestamp,
+    }).catch((error) => {
+      console.warn("Failed to register player disconnect handler", error);
+      setLastFirebaseError(error);
+    });
+  }
+
+  async function cancelPlayerPresence(roomCode, playerId) {
+    if (!db || !roomCode || !playerId) return;
+
+    try {
+      await db.ref(`rooms/${roomCode}/players/${playerId}`).onDisconnect().cancel();
+    } catch (error) {
+      console.warn("Failed to cancel player disconnect handler", error);
+      setLastFirebaseError(error);
+    }
   }
 
   function waitForAuthState() {
@@ -629,6 +674,9 @@
       score: 0,
       isHost: host,
       ready: false,
+      online: true,
+      lastSeenAt: getServerTimestamp(),
+      disconnectedAt: null,
       joinedAt: Date.now(),
     };
   }
@@ -641,8 +689,12 @@
     });
   }
 
+  function getActivePlayers(players = {}) {
+    return Object.values(players || {}).filter((player) => player.online !== false);
+  }
+
   function areAllPlayersReady(players = {}) {
-    const playerEntries = Object.values(players || {});
+    const playerEntries = getActivePlayers(players);
     if (!playerEntries.length) return false;
 
     return playerEntries.every((player) => player.ready === true);
@@ -664,6 +716,11 @@
 
     if (player.id === currentPlayerId) {
       badges.push(`<span class="me-badge">나</span>`);
+    }
+
+    if (player.online === false) {
+      badges.push(`<span class="offline-badge">오프라인</span>`);
+      return badges.join("");
     }
 
     if (latestRoom?.status === "waiting") {
@@ -699,7 +756,7 @@
     }
 
     playerList.innerHTML = playerEntries.map((player) => `
-      <div class="player-row">
+      <div class="player-row ${player.online === false ? "offline" : ""}">
         <span class="player-name">${escapeHtml(player.name || "플레이어")}</span>
         <span class="player-score">${player.score || 0}점</span>
         ${renderPlayerBadges(player)}
@@ -718,7 +775,7 @@
     }
 
     multiScoreboard.innerHTML = playerEntries.map((player) => `
-      <div class="player-row">
+      <div class="player-row ${player.online === false ? "offline" : ""}">
         <span class="player-name">${escapeHtml(player.name || "플레이어")}</span>
         <span class="player-score">${player.score || 0}점</span>
         ${renderPlayerBadges(player)}
@@ -897,6 +954,74 @@
     }
 
     scheduledAutoNextRoundKey = "";
+  }
+
+  async function cleanupInactivePlayers(roomCode, room) {
+    if (!isHost || !db || !roomCode || room?.status !== "waiting") return;
+
+    const now = Date.now();
+    const updates = {};
+
+    Object.entries(room.players || {}).forEach(([playerId, player]) => {
+      if (
+        player.online === false &&
+        player.disconnectedAt &&
+        now - Number(player.disconnectedAt) >= OFFLINE_CLEANUP_MS
+      ) {
+        updates[`players/${playerId}`] = null;
+      }
+    });
+
+    if (Object.keys(updates).length) {
+      await db.ref(`rooms/${roomCode}`).update(updates);
+    }
+  }
+
+  async function maybeTransferHostIfOffline(roomCode, room) {
+    if (!db || !roomCode || !currentPlayerId || !room?.hostId) return;
+
+    const players = room.players || {};
+    const hostPlayer = players[room.hostId];
+    const now = Date.now();
+
+    if (
+      !hostPlayer ||
+      hostPlayer.online !== false ||
+      !hostPlayer.disconnectedAt ||
+      now - Number(hostPlayer.disconnectedAt) < HOST_TRANSFER_MS
+    ) {
+      return;
+    }
+
+    const onlinePlayers = Object.values(players)
+      .filter((player) => player.id && player.online !== false && player.id !== room.hostId)
+      .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+
+    const newHost = onlinePlayers[0];
+    if (!newHost || newHost.id !== currentPlayerId) return;
+
+    await db.ref(`rooms/${roomCode}`).update({
+      hostId: newHost.id,
+      [`players/${room.hostId}/isHost`]: false,
+      [`players/${newHost.id}/isHost`]: true,
+    });
+  }
+
+  function runPresenceMaintenance(room) {
+    if (!room || !currentRoomCode) return;
+
+    const now = Date.now();
+    if (now - lastPresenceMaintenanceAt < PRESENCE_CLEANUP_INTERVAL_MS) return;
+
+    lastPresenceMaintenanceAt = now;
+    cleanupInactivePlayers(currentRoomCode, room).catch((error) => {
+      console.warn("Failed to cleanup inactive players", error);
+      setLastFirebaseError(error);
+    });
+    maybeTransferHostIfOffline(currentRoomCode, room).catch((error) => {
+      console.warn("Failed to transfer offline host", error);
+      setLastFirebaseError(error);
+    });
   }
 
   function getRoundKey(room) {
@@ -1128,6 +1253,7 @@
     }
 
     syncLocalRoomState(room);
+    runPresenceMaintenance(room);
     renderPlayers(room.players || {});
 
     if (room.status === "waiting") {
@@ -1268,6 +1394,7 @@
 
     await db.ref(`rooms/${roomCode}`).set(roomData);
     isHost = true;
+    setupPlayerPresence(roomCode, currentPlayerId);
     saveLastRoomSession(roomCode, currentPlayerName);
     renderResumeRoomBox();
     updateDebugPanel(roomData);
@@ -1363,11 +1490,15 @@
       score: existingPlayer?.score ?? 0,
       isHost: existingPlayer?.isHost ?? false,
       ready: room.status === "waiting" ? false : Boolean(existingPlayer?.ready),
+      online: true,
+      lastSeenAt: getServerTimestamp(),
+      disconnectedAt: null,
       joinedAt: existingPlayer?.joinedAt ?? Date.now(),
     };
 
     await db.ref(`rooms/${roomCode}/players/${currentPlayerId}`).set(playerData);
     isHost = room.hostId === currentPlayerId || playerData.isHost;
+    setupPlayerPresence(roomCode, currentPlayerId);
     saveLastRoomSession(roomCode, currentPlayerName);
     renderResumeRoomBox();
     updateDebugPanel(room);
@@ -1382,6 +1513,7 @@
 
     clearLastRoomSession();
     clearRoomSubscription();
+    await cancelPlayerPresence(roomCode, playerId);
 
     if (db && roomCode && playerId) {
       if (!hostLeaving) {

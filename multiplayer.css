@@ -227,6 +227,11 @@
   font-weight: 800;
 }
 
+.player-row.offline,
+.score-row.offline {
+  opacity: 0.58;
+}
+
 .player-name {
   min-width: 0;
   overflow: hidden;
@@ -273,6 +278,16 @@
 .not-ready-badge {
   background: #fff0d9;
   color: #784619;
+}
+
+.offline-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #ece7e2;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .empty-player {
@@ -392,7 +407,8 @@ button:disabled {
   .host-badge,
   .me-badge,
   .ready-badge,
-  .not-ready-badge {
+  .not-ready-badge,
+  .offline-badge {
     justify-self: start;
   }
 
