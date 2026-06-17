@@ -127,33 +127,6 @@
   line-height: 1.45;
 }
 
-.countdown-text {
-  width: fit-content;
-  min-width: 72px;
-  margin: 10px auto;
-  padding: 12px 18px;
-  border-radius: 999px;
-  background: var(--primary);
-  color: white;
-  font-size: 36px;
-  font-weight: 1000;
-  line-height: 1;
-  box-shadow: 0 10px 22px rgba(255, 122, 89, 0.28);
-  animation: countdownPop 0.32s ease-out;
-}
-
-@keyframes countdownPop {
-  from {
-    transform: scale(0.85);
-    opacity: 0.4;
-  }
-
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
 .player-panel,
 .scoreboard,
 .leaderboard {
@@ -378,12 +351,6 @@ button:disabled {
 
 .status-text.error {
   color: var(--danger);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .countdown-text {
-    animation: none !important;
-  }
 }
 
 @media (max-width: 360px) {
