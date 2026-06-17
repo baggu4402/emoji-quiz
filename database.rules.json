@@ -72,6 +72,12 @@
           "startedAt": {
             ".validate": "newData.isNumber() && newData.val() > 0"
           },
+          "countdownSeconds": {
+            ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 10)"
+          },
+          "isCountingDown": {
+            ".validate": "!newData.exists() || newData.isBoolean()"
+          },
           "timeLimitSeconds": {
             ".validate": "newData.isNumber() && newData.val() >= 5 && newData.val() <= 120"
           },

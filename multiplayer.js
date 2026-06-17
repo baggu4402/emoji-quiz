@@ -5,9 +5,10 @@
   const authFailedMessage = "멀티플레이 인증에 실패했습니다. Firebase Anonymous Auth 설정을 확인해주세요.";
   const roundReadyMessage = "가장 먼저 맞히면 +10점";
   const ROUND_TIME_LIMIT_SECONDS = 20;
+  const ROUND_COUNTDOWN_SECONDS = 3;
   const DEFAULT_QUESTION_LIMIT = 10;
   const HINT_REVEAL_SECONDS = 5;
-  const AUTO_NEXT_DELAY_MS = 3000;
+  const AUTO_NEXT_DELAY_MS = 2000;
   const MAX_ROOM_PLAYERS = 6;
   const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
   const THIRTY_MINUTES_MS = 30 * 60 * 1000;
@@ -60,6 +61,7 @@
   const multiMyScore = document.querySelector("#multi-my-score");
   const multiQuizCard = document.querySelector("#multi-quiz-screen .quiz-card");
   const multiEmojiText = document.querySelector("#multi-emoji-text");
+  const multiCountdownText = document.querySelector("#multi-countdown-text");
   const multiCorrectBurst = document.querySelector("#multi-correct-burst");
   const multiRoundStatus = document.querySelector("#multi-round-status");
   const multiHintText = document.querySelector("#multi-hint-text");
@@ -583,15 +585,17 @@
   function createRoundState(index, timeLimitSeconds) {
     return {
       index,
+      startedAt: Date.now() + (ROUND_COUNTDOWN_SECONDS * 1000),
+      countdownSeconds: ROUND_COUNTDOWN_SECONDS,
+      isCountingDown: true,
+      timeLimitSeconds: clampNumber(timeLimitSeconds, ROUND_TIME_LIMIT_SECONDS, 5, 120),
+      hintShown: false,
+      hintShownAt: null,
       winnerId: null,
       winnerName: null,
       answer: null,
       answeredAt: null,
-      startedAt: Date.now(),
-      timeLimitSeconds: clampNumber(timeLimitSeconds, ROUND_TIME_LIMIT_SECONDS, 5, 120),
       isTimeOver: false,
-      hintShown: false,
-      hintShownAt: null,
       pointsAwarded: 0,
       wrongAnswers: {},
     };
@@ -806,11 +810,41 @@
   }
 
   function getRemainingSeconds(currentRound = {}) {
-    const startedAt = currentRound.startedAt || Date.now();
+    const startedAt = Number(currentRound.startedAt) || Date.now();
     const timeLimitSeconds = currentRound.timeLimitSeconds || ROUND_TIME_LIMIT_SECONDS;
-    const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
 
     return Math.max(0, timeLimitSeconds - elapsedSeconds);
+  }
+
+  function getRemainingCountdownSeconds(currentRound = {}) {
+    if (!currentRound?.startedAt) return 0;
+
+    return Math.max(0, Math.ceil((Number(currentRound.startedAt) - Date.now()) / 1000));
+  }
+
+  function isRoundCountingDown(currentRound = {}) {
+    return getRemainingCountdownSeconds(currentRound) > 0;
+  }
+
+  function hasRoundStarted(currentRound = {}) {
+    return !currentRound?.startedAt || Date.now() >= Number(currentRound.startedAt);
+  }
+
+  function renderCountdownText(currentRound = {}) {
+    const remainingCountdown = getRemainingCountdownSeconds(currentRound);
+
+    if (!multiCountdownText) return remainingCountdown;
+
+    if (remainingCountdown > 0) {
+      const countdownSeconds = clampNumber(currentRound.countdownSeconds, ROUND_COUNTDOWN_SECONDS, 0, 10);
+      multiCountdownText.textContent = String(Math.min(remainingCountdown, countdownSeconds || ROUND_COUNTDOWN_SECONDS));
+      multiCountdownText.classList.remove("hidden");
+    } else {
+      multiCountdownText.classList.add("hidden");
+    }
+
+    return remainingCountdown;
   }
 
   function renderTimerText(remainingSeconds) {
@@ -864,14 +898,33 @@
     }, AUTO_NEXT_DELAY_MS);
   }
 
+  async function markRoundCountdownComplete(room) {
+    if (!isHost || !currentRoomCode || !db) return;
+
+    const currentRound = room?.currentRound || {};
+    if (!currentRound.isCountingDown || !hasRoundStarted(currentRound)) return;
+
+    await db.ref(`rooms/${currentRoomCode}/currentRound`).transaction((round) => {
+      if (!round || !round.isCountingDown || !hasRoundStarted(round)) {
+        return round;
+      }
+
+      return {
+        ...round,
+        isCountingDown: false,
+      };
+    });
+  }
+
   async function markCurrentRoundTimeOver(room) {
     if (!isHost || !currentRoomCode || !db) return;
 
     const question = getCurrentQuestion(room);
     if (!question) return;
+    if (!hasRoundStarted(room?.currentRound)) return;
 
     await db.ref(`rooms/${currentRoomCode}/currentRound`).transaction((currentRound) => {
-      if (!currentRound || currentRound.winnerId || currentRound.isTimeOver) {
+      if (!currentRound || currentRound.winnerId || currentRound.isTimeOver || !hasRoundStarted(currentRound)) {
         return currentRound;
       }
 
@@ -887,9 +940,10 @@
 
   async function revealRoundHint(room) {
     if (!isHost || !currentRoomCode || !db) return;
+    if (!hasRoundStarted(room?.currentRound)) return;
 
     await db.ref(`rooms/${currentRoomCode}/currentRound`).transaction((currentRound) => {
-      if (!currentRound || currentRound.winnerId || currentRound.isTimeOver || currentRound.hintShown) {
+      if (!currentRound || currentRound.winnerId || currentRound.isTimeOver || currentRound.hintShown || !hasRoundStarted(currentRound)) {
         return currentRound;
       }
 
@@ -913,7 +967,18 @@
 
     const tick = () => {
       const remainingSeconds = getRemainingSeconds(currentRound);
+      const roundStarted = hasRoundStarted(currentRound);
+
       renderTimerText(remainingSeconds);
+      renderCountdownText(currentRound);
+
+      if (!roundStarted) {
+        return;
+      }
+
+      if (isHost && currentRound.isCountingDown) {
+        markRoundCountdownComplete(room).catch(setLastFirebaseError);
+      }
 
       if (isHost && remainingSeconds <= HINT_REVEAL_SECONDS && !currentRound.hintShown) {
         revealRoundHint(room).catch(setLastFirebaseError);
@@ -960,6 +1025,7 @@
     const hasWinner = Boolean(currentRound.winnerId);
     const isTimeOver = Boolean(currentRound.isTimeOver);
     const roundEnded = hasWinner || isTimeOver;
+    const isCountingDown = isRoundCountingDown(currentRound);
     const actualCategoryName = typeof getCategoryName === "function"
       ? getCategoryName(question?.category)
       : question?.category || "랜덤";
@@ -982,6 +1048,7 @@
     setText(multiQuestionCount, `문제 ${currentIndex + 1} / ${questionTotal}`);
     setText(multiMyScore, me.score || 0);
     setText(multiEmojiText, question?.emoji || "🎮");
+    renderCountdownText(currentRound);
     renderMultiplayerScoreboard(players);
     renderWrongAnswers(currentRound.wrongAnswers || {});
 
@@ -997,11 +1064,11 @@
     }
 
     if (multiAnswerInput) {
-      multiAnswerInput.disabled = roundEnded;
+      multiAnswerInput.disabled = roundEnded || isCountingDown;
     }
 
     if (multiSubmitBtn) {
-      multiSubmitBtn.disabled = roundEnded;
+      multiSubmitBtn.disabled = roundEnded || isCountingDown;
     }
 
     if (multiRoundStatus) {
@@ -1015,6 +1082,9 @@
       } else if (isTimeOver) {
         multiRoundStatus.textContent = `시간 초과! 정답: ${currentRound.answer || question?.answers?.[0] || ""}`;
         multiRoundStatus.className = "feedback-text wrong";
+      } else if (isCountingDown) {
+        multiRoundStatus.textContent = "잠시 후 문제가 시작됩니다.";
+        multiRoundStatus.className = "feedback-text";
       } else {
         multiRoundStatus.textContent = currentRound.hintShown ? "힌트 공개 후 맞히면 +5점" : roundReadyMessage;
         multiRoundStatus.className = "feedback-text";
@@ -1420,6 +1490,7 @@
     const currentRound = currentRoundSnapshot.val();
 
     if (!currentRound || currentRound.winnerId || currentRound.isTimeOver) return;
+    if (isRoundCountingDown(currentRound)) return;
     if (getRemainingSeconds(currentRound) <= 0) return;
 
     await db.ref(`rooms/${currentRoomCode}/currentRound/wrongAnswers`).push({
@@ -1438,6 +1509,13 @@
 
     if (!room || room.status !== "playing") return;
     if (room.currentRound?.winnerId || room.currentRound?.isTimeOver) return;
+    if (isRoundCountingDown(room.currentRound)) {
+      if (multiRoundStatus) {
+        multiRoundStatus.textContent = "아직 문제가 시작되지 않았습니다.";
+        multiRoundStatus.className = "feedback-text";
+      }
+      return;
+    }
     if (getRemainingSeconds(room.currentRound) <= 0) return;
 
     const question = getCurrentQuestion(room);
@@ -1464,7 +1542,13 @@
 
     const roundRef = db.ref(`rooms/${currentRoomCode}/currentRound`);
     const transactionResult = await roundRef.transaction((currentRound) => {
-      if (!currentRound || currentRound.winnerId || currentRound.isTimeOver || getRemainingSeconds(currentRound) <= 0) {
+      if (
+        !currentRound ||
+        currentRound.winnerId ||
+        currentRound.isTimeOver ||
+        isRoundCountingDown(currentRound) ||
+        getRemainingSeconds(currentRound) <= 0
+      ) {
         return currentRound;
       }
 
