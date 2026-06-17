@@ -961,8 +961,6 @@
     const hasWinner = Boolean(currentRound.winnerId);
     const isTimeOver = Boolean(currentRound.isTimeOver);
     const roundEnded = hasWinner || isTimeOver;
-    const isLastQuestion = currentIndex >= questionTotal - 1;
-    const autoNextMessage = isLastQuestion ? "3초 후 결과를 표시합니다." : "3초 후 다음 문제로 넘어갑니다.";
     const actualCategoryName = typeof getCategoryName === "function"
       ? getCategoryName(question?.category)
       : question?.category || "랜덤";
@@ -1013,10 +1011,10 @@
         const winnerMessage = currentRound.hintShown
           ? `${currentRound.winnerName || "누군가"}님이 힌트 후 맞혔습니다! +5점`
           : `${currentRound.winnerName || "누군가"}님이 먼저 맞혔습니다! +${pointsAwarded}점`;
-        multiRoundStatus.textContent = `${winnerMessage} 정답: ${currentRound.answer || ""} · ${autoNextMessage}`;
+        multiRoundStatus.textContent = `${winnerMessage} 정답: ${currentRound.answer || ""}`;
         multiRoundStatus.className = "feedback-text correct";
       } else if (isTimeOver) {
-        multiRoundStatus.textContent = `시간 초과! 정답: ${currentRound.answer || question?.answers?.[0] || ""} · ${autoNextMessage}`;
+        multiRoundStatus.textContent = `시간 초과! 정답: ${currentRound.answer || question?.answers?.[0] || ""}`;
         multiRoundStatus.className = "feedback-text wrong";
       } else {
         multiRoundStatus.textContent = currentRound.hintShown ? "힌트 공개 후 맞히면 +5점" : roundReadyMessage;
@@ -1029,6 +1027,7 @@
     }
 
     if (multiNextBtn) {
+      const isLastQuestion = currentIndex >= questionTotal - 1;
       multiNextBtn.textContent = isLastQuestion ? "결과 보기" : "다음 문제";
       multiNextBtn.classList.add("hidden");
       multiNextBtn.disabled = true;
