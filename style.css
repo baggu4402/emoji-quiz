@@ -560,6 +560,14 @@ h2 {
   display: none !important;
 }
 
+.debug-only {
+  display: none !important;
+}
+
+body.debug-mode .debug-only {
+  display: block !important;
+}
+
 .result-card {
   text-align: center;
 }

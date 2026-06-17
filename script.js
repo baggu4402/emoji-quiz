@@ -10,6 +10,14 @@ const FEEDBACK_THROTTLE_MS = 2000;
 let soloFeedbackAuthReadyPromise = null;
 let lastSoloFeedbackSubmittedAt = 0;
 
+function isAppDebugMode() {
+  const params = new URLSearchParams(window.location.search);
+  const debugValue = params.get("debug");
+  return debugValue === "1" || debugValue === "true";
+}
+
+window.isAppDebugMode = isAppDebugMode;
+
 const categories = [
   { id: "random", name: "랜덤", icon: "🎲" },
   { id: "movie", name: "영화", icon: "🎬" },
@@ -2623,6 +2631,14 @@ function updateVersionUI() {
   }
 }
 
+function initDebugOnlyUI() {
+  const isDebug = isAppDebugMode();
+  document.body.classList.toggle("debug-mode", isDebug);
+  document.querySelectorAll(".debug-only").forEach((element) => {
+    element.classList.toggle("hidden", !isDebug);
+  });
+}
+
 async function refreshAppCache() {
   try {
     if ("serviceWorker" in navigator) {
@@ -3260,6 +3276,7 @@ function init() {
   buildSoloDifficultyButtons();
   buildCategoryButtons();
   initSettingsUI();
+  initDebugOnlyUI();
   bindEvents();
 }
 

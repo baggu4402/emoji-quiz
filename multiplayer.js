@@ -137,6 +137,10 @@
   }
 
   function isDebugMode() {
+    if (typeof window.isAppDebugMode === "function") {
+      return window.isAppDebugMode();
+    }
+
     const params = new URLSearchParams(window.location.search);
     const debugValue = params.get("debug");
     return debugValue === "1" || debugValue === "true";
