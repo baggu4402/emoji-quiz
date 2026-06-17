@@ -36,6 +36,7 @@
   const leaveRoomBtn = document.querySelector("#leave-room-btn");
   const multiLeaveBtn = document.querySelector("#multi-leave-btn");
   const startRoomGameBtn = document.querySelector("#start-room-game-btn");
+  const toggleReadyBtn = document.querySelector("#toggle-ready-btn");
   const playerNameInput = document.querySelector("#player-name-input");
   const roomCodeInput = document.querySelector("#room-code-input");
   const resumeRoomBox = document.querySelector("#resume-room-box");
@@ -627,6 +628,7 @@
       name: currentPlayerName,
       score: 0,
       isHost: host,
+      ready: false,
       joinedAt: Date.now(),
     };
   }
@@ -639,6 +641,20 @@
     });
   }
 
+  function areAllPlayersReady(players = {}) {
+    const playerEntries = Object.values(players || {});
+    if (!playerEntries.length) return false;
+
+    return playerEntries.every((player) => player.ready === true);
+  }
+
+  function getReadyResetUpdates(players = {}) {
+    return Object.keys(players || {}).reduce((updates, playerId) => {
+      updates[`players/${playerId}/ready`] = false;
+      return updates;
+    }, {});
+  }
+
   function renderPlayerBadges(player, hostId = latestRoom?.hostId) {
     const badges = [];
 
@@ -648,6 +664,12 @@
 
     if (player.id === currentPlayerId) {
       badges.push(`<span class="me-badge">나</span>`);
+    }
+
+    if (latestRoom?.status === "waiting") {
+      badges.push(player.ready === true
+        ? `<span class="ready-badge">준비완료</span>`
+        : `<span class="not-ready-badge">준비중</span>`);
     }
 
     return badges.join("");
@@ -763,26 +785,50 @@
   }
 
   function updateHostControls(room = latestRoom) {
+    const isWaiting = room?.status === "waiting";
+    const players = room?.players || {};
+    const me = players[currentPlayerId] || {};
+    const allReady = areAllPlayersReady(players);
+
     if (multiCategorySelect) {
-      multiCategorySelect.disabled = !isHost || room?.status !== "waiting";
+      multiCategorySelect.disabled = !isHost || !isWaiting;
     }
 
     if (multiDifficultySelect) {
-      multiDifficultySelect.disabled = !isHost || room?.status !== "waiting";
+      multiDifficultySelect.disabled = !isHost || !isWaiting;
     }
 
     if (multiQuestionLimitSelect) {
-      multiQuestionLimitSelect.disabled = !isHost || room?.status !== "waiting";
+      multiQuestionLimitSelect.disabled = !isHost || !isWaiting;
     }
 
     if (multiTimeLimitSelect) {
-      multiTimeLimitSelect.disabled = !isHost || room?.status !== "waiting";
+      multiTimeLimitSelect.disabled = !isHost || !isWaiting;
     }
 
-    if (!startRoomGameBtn) return;
+    if (toggleReadyBtn) {
+      toggleReadyBtn.classList.toggle("hidden", !isWaiting || !currentPlayerId);
+      toggleReadyBtn.disabled = !isWaiting || !currentPlayerId;
+      toggleReadyBtn.textContent = me.ready === true ? "준비 취소" : "준비 완료";
+    }
 
-    startRoomGameBtn.disabled = !isHost;
-    startRoomGameBtn.textContent = isHost ? "게임 시작" : "방장이 시작할 때까지 대기";
+    if (startRoomGameBtn) {
+      startRoomGameBtn.classList.toggle("hidden", !isHost);
+      startRoomGameBtn.disabled = !isHost || !isWaiting || !allReady;
+      startRoomGameBtn.textContent = isHost ? "게임 시작" : "방장이 시작할 때까지 대기";
+    }
+
+    if (isWaiting && roomStatusText) {
+      if (isHost) {
+        setRoomStatus(allReady
+          ? "모든 참가자가 준비했습니다. 게임을 시작할 수 있습니다."
+          : "모든 참가자가 준비하면 시작할 수 있습니다.");
+      } else {
+        setRoomStatus(me.ready === true
+          ? "방장이 시작할 때까지 기다려주세요."
+          : "준비 완료를 눌러주세요.");
+      }
+    }
   }
 
   function syncLocalRoomState(room) {
@@ -1316,6 +1362,7 @@
       name: currentPlayerName,
       score: existingPlayer?.score ?? 0,
       isHost: existingPlayer?.isHost ?? false,
+      ready: room.status === "waiting" ? false : Boolean(existingPlayer?.ready),
       joinedAt: existingPlayer?.joinedAt ?? Date.now(),
     };
 
@@ -1379,25 +1426,64 @@
   async function updateRoomCategory() {
     if (!roomRef || !isHost || latestRoom?.status !== "waiting") return;
 
-    await roomRef.update({ category: getSelectedCategory() });
+    await roomRef.update({
+      category: getSelectedCategory(),
+      ...getReadyResetUpdates(latestRoom.players),
+    });
   }
 
   async function updateRoomDifficulty() {
     if (!roomRef || !isHost || latestRoom?.status !== "waiting") return;
 
-    await roomRef.update({ difficulty: getSelectedDifficulty() });
+    await roomRef.update({
+      difficulty: getSelectedDifficulty(),
+      ...getReadyResetUpdates(latestRoom.players),
+    });
   }
 
   async function updateRoomQuestionLimit() {
     if (!roomRef || !isHost || latestRoom?.status !== "waiting") return;
 
-    await roomRef.update({ questionLimit: getSelectedQuestionLimit() });
+    await roomRef.update({
+      questionLimit: getSelectedQuestionLimit(),
+      ...getReadyResetUpdates(latestRoom.players),
+    });
   }
 
   async function updateRoomTimeLimit() {
     if (!roomRef || !isHost || latestRoom?.status !== "waiting") return;
 
-    await roomRef.update({ timeLimitSeconds: getSelectedTimeLimitSeconds() });
+    await roomRef.update({
+      timeLimitSeconds: getSelectedTimeLimitSeconds(),
+      ...getReadyResetUpdates(latestRoom.players),
+    });
+  }
+
+  async function toggleReady() {
+    if (!currentRoomCode) return;
+
+    if (!initFirebase()) {
+      setRoomStatus(unavailableMessage, "error");
+      return;
+    }
+
+    try {
+      await ensureAnonymousAuth();
+    } catch (error) {
+      console.warn("Failed to sign in anonymously", error);
+      setLastFirebaseError(error);
+      setRoomStatus(authFailedMessage, "error");
+      return;
+    }
+
+    currentPlayerId = getCurrentPlayerId();
+    const roomSnapshot = await db.ref(`rooms/${currentRoomCode}`).get();
+    const room = roomSnapshot.val();
+
+    if (!room || room.status !== "waiting") return;
+
+    const currentReady = room.players?.[currentPlayerId]?.ready === true;
+    await db.ref(`rooms/${currentRoomCode}/players/${currentPlayerId}/ready`).set(!currentReady);
   }
 
   async function startRoomGame() {
@@ -1405,6 +1491,17 @@
 
     if (!initFirebase()) {
       setRoomStatus(unavailableMessage);
+      return;
+    }
+
+    currentPlayerId = getCurrentPlayerId();
+    const roomSnapshot = await db.ref(`rooms/${currentRoomCode}`).get();
+    const room = roomSnapshot.val();
+
+    if (!room || room.status !== "waiting" || room.hostId !== currentPlayerId) return;
+
+    if (!areAllPlayersReady(room.players)) {
+      setRoomStatus("모든 참가자가 준비해야 시작할 수 있습니다.");
       return;
     }
 
@@ -1585,6 +1682,7 @@
 
       Object.entries(players).forEach(([playerId]) => {
         updates[`players/${playerId}/score`] = 0;
+        updates[`players/${playerId}/ready`] = false;
         updates[`players/${playerId}/isHost`] = playerId === room.hostId;
       });
 
@@ -1726,6 +1824,13 @@
       rematchRoom().catch((error) => {
         setLastFirebaseError(error);
         setStatusMessage(multiRematchStatus, "다시 시작할 수 없습니다. 방 상태를 확인해주세요.", "error");
+      });
+    });
+
+    toggleReadyBtn?.addEventListener("click", () => {
+      toggleReady().catch((error) => {
+        setLastFirebaseError(error);
+        setRoomStatus("준비 상태를 변경할 수 없습니다. 잠시 후 다시 시도해주세요.", "error");
       });
     });
 

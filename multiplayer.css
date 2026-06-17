@@ -218,7 +218,7 @@
 
 .player-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
@@ -254,6 +254,25 @@
   color: var(--success);
   font-size: 12px;
   white-space: nowrap;
+}
+
+.ready-badge,
+.not-ready-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ready-badge {
+  background: #dff8e8;
+  color: #168a4a;
+}
+
+.not-ready-badge {
+  background: #fff0d9;
+  color: #784619;
 }
 
 .empty-player {
@@ -371,7 +390,9 @@ button:disabled {
   }
 
   .host-badge,
-  .me-badge {
+  .me-badge,
+  .ready-badge,
+  .not-ready-badge {
     justify-self: start;
   }
 

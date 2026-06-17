@@ -121,6 +121,9 @@
             "isHost": {
               ".validate": "newData.isBoolean()"
             },
+            "ready": {
+              ".validate": "newData.isBoolean()"
+            },
             "joinedAt": {
               ".validate": "newData.isNumber() && newData.val() > 0"
             }
