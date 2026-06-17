@@ -1,6 +1,8 @@
 const APP_VERSION = "v0.9.0-beta";
 const QUESTION_LIMIT = 10;
 const BEST_SCORE_KEY = "emojiQuizBestScore";
+const SOUND_ENABLED_KEY = "emojiQuizSoundEnabled";
+const VIBRATION_ENABLED_KEY = "emojiQuizVibrationEnabled";
 
 const categories = [
   { id: "random", name: "랜덤", icon: "🎲" },
@@ -2548,7 +2550,24 @@ function showTemporaryElement(element, duration = 700) {
   }, duration);
 }
 
+function getSoundEnabled() {
+  return localStorage.getItem(SOUND_ENABLED_KEY) !== "false";
+}
+
+function setSoundEnabled(value) {
+  localStorage.setItem(SOUND_ENABLED_KEY, String(Boolean(value)));
+}
+
+function getVibrationEnabled() {
+  return localStorage.getItem(VIBRATION_ENABLED_KEY) !== "false";
+}
+
+function setVibrationEnabled(value) {
+  localStorage.setItem(VIBRATION_ENABLED_KEY, String(Boolean(value)));
+}
+
 function vibrateFeedback(pattern) {
+  if (!getVibrationEnabled()) return;
   if (!navigator.vibrate) return;
 
   try {
@@ -2559,6 +2578,8 @@ function vibrateFeedback(pattern) {
 }
 
 function playFeedbackSound(type) {
+  if (!getSoundEnabled()) return;
+
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
@@ -2610,6 +2631,25 @@ window.playFeedbackSound = playFeedbackSound;
 window.vibrateFeedback = vibrateFeedback;
 window.playCorrectFeedback = playCorrectFeedback;
 window.playWrongFeedback = playWrongFeedback;
+
+function initSettingsUI() {
+  const soundToggle = document.querySelector("#sound-toggle");
+  const vibrationToggle = document.querySelector("#vibration-toggle");
+
+  if (soundToggle) {
+    soundToggle.checked = getSoundEnabled();
+    soundToggle.addEventListener("change", () => {
+      setSoundEnabled(soundToggle.checked);
+    });
+  }
+
+  if (vibrationToggle) {
+    vibrationToggle.checked = getVibrationEnabled();
+    vibrationToggle.addEventListener("change", () => {
+      setVibrationEnabled(vibrationToggle.checked);
+    });
+  }
+}
 
 function getSoloShareText() {
   return [
@@ -3042,6 +3082,7 @@ function init() {
   updateBestScoreUI();
   buildSoloDifficultyButtons();
   buildCategoryButtons();
+  initSettingsUI();
   bindEvents();
 }
 
