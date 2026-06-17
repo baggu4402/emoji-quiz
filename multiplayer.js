@@ -33,6 +33,8 @@
   let lastRoomStatus = "-";
   let lastCelebratedRoundKey = "";
   let lastPresenceMaintenanceAt = 0;
+  let isLeavingRoom = false;
+  let isClosingRoom = false;
 
   const multiplayerOpenBtn = document.querySelector("#multiplayer-open-btn");
   const createRoomBtn = document.querySelector("#create-room-btn");
@@ -41,6 +43,7 @@
   const multiLeaveBtn = document.querySelector("#multi-leave-btn");
   const startRoomGameBtn = document.querySelector("#start-room-game-btn");
   const toggleReadyBtn = document.querySelector("#toggle-ready-btn");
+  const closeRoomBtn = document.querySelector("#close-room-btn");
   const playerNameInput = document.querySelector("#player-name-input");
   const roomCodeInput = document.querySelector("#room-code-input");
   const resumeRoomBox = document.querySelector("#resume-room-box");
@@ -755,13 +758,29 @@
       return;
     }
 
-    playerList.innerHTML = playerEntries.map((player) => `
-      <div class="player-row ${player.online === false ? "offline" : ""}">
-        <span class="player-name">${escapeHtml(player.name || "플레이어")}</span>
-        <span class="player-score">${player.score || 0}점</span>
-        ${renderPlayerBadges(player)}
-      </div>
-    `).join("");
+    playerList.innerHTML = playerEntries.map((player) => {
+      const canKickPlayer = Boolean(
+        isHost &&
+        latestRoom?.status === "waiting" &&
+        player.id &&
+        player.id !== currentPlayerId
+      );
+      const playerName = escapeHtml(player.name || "플레이어");
+      const kickButton = canKickPlayer
+        ? `<button class="kick-player-btn" type="button" data-player-id="${escapeHtml(player.id)}" aria-label="${playerName} 내보내기">내보내기</button>`
+        : "";
+
+      return `
+        <div class="player-row ${player.online === false ? "offline" : ""}">
+          <span class="player-name">${playerName}</span>
+          <div class="player-row-actions">
+            <span class="player-score">${player.score || 0}점</span>
+            ${renderPlayerBadges(player)}
+            ${kickButton}
+          </div>
+        </div>
+      `;
+    }).join("");
   }
 
   function renderMultiplayerScoreboard(players = {}) {
@@ -777,8 +796,10 @@
     multiScoreboard.innerHTML = playerEntries.map((player) => `
       <div class="player-row ${player.online === false ? "offline" : ""}">
         <span class="player-name">${escapeHtml(player.name || "플레이어")}</span>
-        <span class="player-score">${player.score || 0}점</span>
-        ${renderPlayerBadges(player)}
+        <div class="player-row-actions">
+          <span class="player-score">${player.score || 0}점</span>
+          ${renderPlayerBadges(player)}
+        </div>
       </div>
     `).join("");
   }
@@ -875,6 +896,11 @@
       startRoomGameBtn.textContent = isHost ? "게임 시작" : "방장이 시작할 때까지 대기";
     }
 
+    if (closeRoomBtn) {
+      closeRoomBtn.classList.toggle("hidden", !isHost || !isWaiting);
+      closeRoomBtn.disabled = !isHost || !isWaiting;
+    }
+
     if (isWaiting && roomStatusText) {
       if (isHost) {
         setRoomStatus(allReady
@@ -911,6 +937,36 @@
 
     updateHostControls(room);
     updateDebugPanel(room);
+  }
+
+  function handleRoomExit(message = "방이 종료되었습니다.") {
+    const roomCode = currentRoomCode;
+    const playerId = currentPlayerId;
+
+    clearRoomSubscription();
+    if (roomCode && playerId) {
+      cancelPlayerPresence(roomCode, playerId).catch((error) => {
+        console.warn("Failed to cancel player presence", error);
+        setLastFirebaseError(error);
+      });
+    }
+    clearLastRoomSession();
+    renderResumeRoomBox();
+    latestRoom = null;
+    currentRoomCode = "";
+    isHost = false;
+    isLeavingRoom = false;
+    isClosingRoom = false;
+    lastRoomStatus = "-";
+    lastCelebratedRoundKey = "";
+    roomRef = null;
+    updateDebugPanel(null);
+    renderPlayers({});
+    renderMultiplayerScoreboard({});
+    setText(roomCodeDisplay, "----");
+    setRoomStatus("");
+    setMenuStatus(message);
+    showScreenSafe("multiplayer-menu-screen");
   }
 
   function getCurrentQuestion(room) {
@@ -1235,20 +1291,17 @@
     const room = snapshot.val();
 
     if (!room) {
-      clearRoomSubscription();
-      clearLastRoomSession();
-      renderResumeRoomBox();
-      latestRoom = null;
-      currentRoomCode = "";
-      isHost = false;
-      lastRoomStatus = "-";
-      lastCelebratedRoundKey = "";
-      roomRef = null;
-      updateDebugPanel(null);
-      renderPlayers({});
-      setText(roomCodeDisplay, "----");
-      setRoomStatus("방이 종료되었습니다.");
-      showScreenSafe("multiplayer-menu-screen");
+      handleRoomExit(isClosingRoom ? "방을 종료했습니다." : "방장이 방을 종료했습니다.");
+      return;
+    }
+
+    if (
+      currentRoomCode &&
+      currentPlayerId &&
+      !isLeavingRoom &&
+      !room.players?.[currentPlayerId]
+    ) {
+      handleRoomExit("방에서 내보내졌습니다.");
       return;
     }
 
@@ -1511,48 +1564,123 @@
     const playerId = currentPlayerId;
     const hostLeaving = isHost;
 
-    clearLastRoomSession();
-    clearRoomSubscription();
-    await cancelPlayerPresence(roomCode, playerId);
+    isLeavingRoom = true;
 
-    if (db && roomCode && playerId) {
-      if (!hostLeaving) {
-        await db.ref(`rooms/${roomCode}/players/${playerId}`).remove();
-      } else {
-        const roomSnapshot = await db.ref(`rooms/${roomCode}`).get();
-        const room = roomSnapshot.val();
-        const players = room?.players || {};
-        const remainingPlayers = Object.values(players)
-          .filter((player) => player.id !== playerId)
-          .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+    try {
+      clearLastRoomSession();
+      clearRoomSubscription();
+      await cancelPlayerPresence(roomCode, playerId);
 
-        if (!remainingPlayers.length) {
-          await db.ref(`rooms/${roomCode}`).remove();
+      if (db && roomCode && playerId) {
+        if (!hostLeaving) {
+          await db.ref(`rooms/${roomCode}/players/${playerId}`).remove();
         } else {
-          const newHost = remainingPlayers[0];
-          await db.ref().update({
-            [`rooms/${roomCode}/hostId`]: newHost.id,
-            [`rooms/${roomCode}/players/${newHost.id}/isHost`]: true,
-            [`rooms/${roomCode}/players/${playerId}`]: null,
-          });
+          const roomSnapshot = await db.ref(`rooms/${roomCode}`).get();
+          const room = roomSnapshot.val();
+          const players = room?.players || {};
+          const remainingPlayers = Object.values(players)
+            .filter((player) => player.id !== playerId)
+            .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+
+          if (!remainingPlayers.length) {
+            await db.ref(`rooms/${roomCode}`).remove();
+          } else {
+            const newHost = remainingPlayers[0];
+            await db.ref().update({
+              [`rooms/${roomCode}/hostId`]: newHost.id,
+              [`rooms/${roomCode}/players/${newHost.id}/isHost`]: true,
+              [`rooms/${roomCode}/players/${playerId}`]: null,
+            });
+          }
         }
       }
+
+      currentRoomCode = "";
+      isHost = false;
+      lastRoomStatus = "-";
+      lastCelebratedRoundKey = "";
+      roomRef = null;
+      latestRoom = null;
+      updateDebugPanel(null);
+      renderPlayers({});
+      renderMultiplayerScoreboard({});
+      setText(roomCodeDisplay, "----");
+      setRoomStatus("");
+      renderResumeRoomBox();
+
+      showScreenSafe(goHome ? "home-screen" : "multiplayer-menu-screen");
+    } finally {
+      isLeavingRoom = false;
+    }
+  }
+
+  async function kickPlayer(playerId) {
+    if (!currentRoomCode || !playerId || playerId === currentPlayerId) return;
+
+    if (!initFirebase()) {
+      setRoomStatus(unavailableMessage, "error");
+      return;
     }
 
-    currentRoomCode = "";
-    isHost = false;
-    lastRoomStatus = "-";
-    lastCelebratedRoundKey = "";
-    roomRef = null;
-    latestRoom = null;
-    updateDebugPanel(null);
-    renderPlayers({});
-    renderMultiplayerScoreboard({});
-    setText(roomCodeDisplay, "----");
-    setRoomStatus("");
-    renderResumeRoomBox();
+    try {
+      await ensureAnonymousAuth();
+      currentPlayerId = getCurrentPlayerId();
 
-    showScreenSafe(goHome ? "home-screen" : "multiplayer-menu-screen");
+      if (!isHost || playerId === currentPlayerId) return;
+
+      const roomSnapshot = await db.ref(`rooms/${currentRoomCode}`).get();
+      const room = roomSnapshot.val();
+
+      if (!room || room.hostId !== currentPlayerId || room.status !== "waiting") {
+        setRoomStatus("참가자를 내보낼 수 없습니다.", "error");
+        return;
+      }
+
+      await db.ref(`rooms/${currentRoomCode}/players/${playerId}`).remove();
+    } catch (error) {
+      console.warn("Failed to kick player", error);
+      setLastFirebaseError(error);
+      setRoomStatus("참가자를 내보낼 수 없습니다.", "error");
+    }
+  }
+
+  async function closeRoom() {
+    if (!currentRoomCode) return;
+
+    if (!initFirebase()) {
+      setRoomStatus(unavailableMessage, "error");
+      return;
+    }
+
+    try {
+      await ensureAnonymousAuth();
+      currentPlayerId = getCurrentPlayerId();
+
+      const roomCode = currentRoomCode;
+      const roomSnapshot = await db.ref(`rooms/${roomCode}`).get();
+      const room = roomSnapshot.val();
+
+      if (!room || room.hostId !== currentPlayerId || room.status !== "waiting") {
+        setRoomStatus("방을 종료할 수 없습니다.", "error");
+        return;
+      }
+
+      if (!window.confirm("방을 종료하시겠습니까? 모든 참가자가 방에서 나가게 됩니다.")) {
+        return;
+      }
+
+      isClosingRoom = true;
+      await db.ref(`rooms/${roomCode}`).remove();
+
+      if (currentRoomCode === roomCode) {
+        handleRoomExit("방을 종료했습니다.");
+      }
+    } catch (error) {
+      isClosingRoom = false;
+      console.warn("Failed to close room", error);
+      setLastFirebaseError(error);
+      setRoomStatus("방을 종료할 수 없습니다.", "error");
+    }
   }
 
   async function updateRoomCategory() {
@@ -1970,6 +2098,25 @@
       startRoomGame().catch((error) => {
         setLastFirebaseError(error);
         setRoomStatus("게임을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.");
+      });
+    });
+
+    closeRoomBtn?.addEventListener("click", () => {
+      closeRoom().catch((error) => {
+        setLastFirebaseError(error);
+        setRoomStatus("방을 종료할 수 없습니다.", "error");
+      });
+    });
+
+    playerList?.addEventListener("click", (event) => {
+      const button = event.target instanceof Element
+        ? event.target.closest(".kick-player-btn")
+        : null;
+      if (!button) return;
+
+      kickPlayer(button.dataset.playerId).catch((error) => {
+        setLastFirebaseError(error);
+        setRoomStatus("참가자를 내보낼 수 없습니다.", "error");
       });
     });
 

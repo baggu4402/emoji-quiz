@@ -218,13 +218,21 @@
 
 .player-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
   border-radius: 14px;
   background: white;
   font-weight: 800;
+}
+
+.player-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .player-row.offline,
@@ -241,6 +249,26 @@
 
 .player-score {
   color: var(--muted);
+}
+
+.danger-btn {
+  color: var(--danger);
+  border-color: rgba(216, 74, 74, 0.25);
+}
+
+.kick-player-btn {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid rgba(216, 74, 74, 0.16);
+  border-radius: 999px;
+  background: rgba(216, 74, 74, 0.1);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.kick-player-btn:active {
+  transform: scale(0.96);
 }
 
 .host-badge {
@@ -402,6 +430,10 @@ button:disabled {
 
   .player-row {
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .player-row-actions {
+    max-width: 100%;
   }
 
   .host-badge,
