@@ -117,6 +117,31 @@
   color: var(--danger);
 }
 
+.room-settings-summary {
+  margin: 10px 0 16px;
+  padding: 9px 12px;
+  border: 1px solid rgba(241, 216, 196, 0.9);
+  border-radius: 999px;
+  background: rgba(255, 248, 239, 0.86);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+  text-align: center;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.room-settings-summary.compact {
+  display: inline-flex;
+  max-width: 100%;
+  margin: 0 0 7px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  text-align: left;
+}
+
 #multi-quiz-screen {
   position: relative;
 }
@@ -543,5 +568,18 @@ button:disabled {
   .multi-feedback-actions .ghost-btn {
     min-height: 32px;
     font-size: 11px;
+  }
+
+  .room-settings-summary {
+    margin: 8px 0 12px;
+    border-radius: 16px;
+    font-size: 12px;
+  }
+
+  .room-settings-summary.compact {
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    white-space: normal;
   }
 }

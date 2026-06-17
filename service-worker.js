@@ -1,4 +1,4 @@
-const CACHE_NAME = "emoji-quiz-cache-v32";
+const CACHE_NAME = "emoji-quiz-cache-v33";
 
 const CORE_ASSETS = [
   "./",

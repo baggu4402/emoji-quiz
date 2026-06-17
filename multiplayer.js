@@ -63,7 +63,9 @@
   const multiDifficultySelect = document.querySelector("#multi-difficulty-select");
   const multiQuestionLimitSelect = document.querySelector("#multi-question-limit-select");
   const multiTimeLimitSelect = document.querySelector("#multi-time-limit-select");
+  const multiRoomSettingsSummary = document.querySelector("#multi-room-settings-summary");
   const multiRoomLabel = document.querySelector("#multi-room-label");
+  const multiGameSettingsSummary = document.querySelector("#multi-game-settings-summary");
   const multiDifficultyLabel = document.querySelector("#multi-difficulty-label");
   const multiQuestionCount = document.querySelector("#multi-question-count");
   const multiTimerText = document.querySelector("#multi-timer-text");
@@ -741,6 +743,24 @@
     return clampNumber(room?.timeLimitSeconds, ROUND_TIME_LIMIT_SECONDS, 5, 120);
   }
 
+  function getRoomDifficultyLabel(room = latestRoom) {
+    const difficulty = room?.difficulty || "all";
+    if (difficulty === "all") return "전체";
+    return typeof getDifficultyText === "function" ? getDifficultyText(difficulty) : difficulty;
+  }
+
+  function getRoomSettingsSummary(room = latestRoom) {
+    const categoryName = typeof getCategoryName === "function"
+      ? getCategoryName(room?.category || "random")
+      : room?.category || "랜덤";
+    return [
+      categoryName,
+      getRoomDifficultyLabel(room),
+      `${getQuestionLimit(room)}문제`,
+      `${getRoundTimeLimitSeconds(room)}초`,
+    ].join(" · ");
+  }
+
   function createRoundState(index, timeLimitSeconds) {
     return {
       index,
@@ -1045,6 +1065,8 @@
       multiTimeLimitSelect.value = String(getRoundTimeLimitSeconds(room));
     }
 
+    setText(multiRoomSettingsSummary, getRoomSettingsSummary(room));
+    setText(multiGameSettingsSummary, getRoomSettingsSummary(room));
     updateHostControls(room);
     updateDebugPanel(room);
   }
@@ -1328,6 +1350,7 @@
 
     resetRoundInputIfNeeded(room);
     setText(multiRoomLabel, `방 코드 ${currentRoomCode || room?.code || "----"} · ${roomLabelCategory}`);
+    setText(multiGameSettingsSummary, getRoomSettingsSummary(room));
     if (multiDifficultyLabel) {
       const difficulty = question?.difficulty || "normal";
       multiDifficultyLabel.textContent = typeof getDifficultyText === "function"
