@@ -476,3 +476,72 @@ button:disabled {
     width: 100%;
   }
 }
+
+@media (max-width: 520px) {
+  .room-card {
+    padding: 18px 16px;
+    border-radius: 22px;
+  }
+
+  .room-card .field-label {
+    margin: 10px 0 6px;
+    font-size: 13px;
+  }
+
+  .select-input {
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: 14px;
+    font-size: 14px;
+  }
+
+  .room-share-actions,
+  .compact-group {
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .player-panel,
+  .scoreboard,
+  .leaderboard {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .multi-main-column {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #multi-quiz-screen .quiz-header {
+    order: 1;
+  }
+
+  #multi-quiz-screen .quiz-card {
+    order: 2;
+  }
+
+  #multi-quiz-screen .quiz-actions {
+    order: 3;
+  }
+
+  .multi-feedback-actions {
+    order: 4;
+    margin-top: 8px;
+  }
+
+  #multi-feedback-status {
+    order: 5;
+  }
+
+  #multi-scoreboard {
+    order: 6;
+    max-height: 150px;
+  }
+
+  .multi-feedback-actions .ghost-btn {
+    min-height: 32px;
+    font-size: 11px;
+  }
+}
