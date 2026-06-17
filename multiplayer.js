@@ -70,7 +70,9 @@
   const multiWrongAnswerList = document.querySelector("#multi-wrong-answer-list");
   const multiResultList = document.querySelector("#multi-result-list");
   const multiResultStatus = document.querySelector("#multi-result-status");
+  const multiRematchStatus = document.querySelector("#multi-rematch-status");
   const multiResultHomeBtn = document.querySelector("#multi-result-home-btn");
+  const rematchRoomBtn = document.querySelector("#rematch-room-btn");
   const shareMultiResultBtn = document.querySelector("#share-multi-result-btn");
   const debugPanel = document.querySelector("#debug-panel");
   const debugToggleBtn = document.querySelector("#debug-toggle-btn");
@@ -724,9 +726,24 @@
   }
 
   function renderMultiplayerResult(players = {}) {
+    lastResultPlayers = players;
+    const canRematch = Boolean(isHost && latestRoom?.status === "finished" && currentRoomCode);
+
+    if (rematchRoomBtn) {
+      rematchRoomBtn.classList.toggle("hidden", !canRematch);
+      rematchRoomBtn.disabled = !canRematch;
+    }
+
+    if (multiRematchStatus) {
+      const hasRoom = Boolean(latestRoom && currentRoomCode);
+      multiRematchStatus.textContent = hasRoom
+        ? (isHost ? "같은 멤버로 다시 시작할 수 있습니다." : "방장이 다시 시작할 때까지 기다려주세요.")
+        : "";
+      multiRematchStatus.className = "status-text rematch-status";
+    }
+
     if (!multiResultList) return;
 
-    lastResultPlayers = players;
     const playerEntries = getSortedPlayers(players);
 
     if (!playerEntries.length) {
@@ -1524,6 +1541,63 @@
     });
   }
 
+  async function rematchRoom() {
+    if (!currentRoomCode) {
+      setStatusMessage(multiRematchStatus, "다시 시작할 수 없습니다. 방 상태를 확인해주세요.", "error");
+      return;
+    }
+
+    if (!initFirebase()) {
+      setStatusMessage(multiRematchStatus, unavailableMessage, "error");
+      return;
+    }
+
+    try {
+      await ensureAnonymousAuth();
+    } catch (error) {
+      console.warn("Failed to sign in anonymously", error);
+      setLastFirebaseError(error);
+      setStatusMessage(multiRematchStatus, authFailedMessage, "error");
+      return;
+    }
+
+    clearAutoNextTimer();
+    currentPlayerId = getCurrentPlayerId();
+    setStatusMessage(multiRematchStatus, "다시 시작 준비 중입니다...");
+
+    try {
+      const roomSnapshot = await db.ref(`rooms/${currentRoomCode}`).get();
+      const room = roomSnapshot.val();
+
+      if (!room || room.hostId !== currentPlayerId) {
+        setStatusMessage(multiRematchStatus, "다시 시작할 수 없습니다. 방 상태를 확인해주세요.", "error");
+        return;
+      }
+
+      const players = room.players || {};
+      const updates = {
+        status: "waiting",
+        currentQuestionIndex: 0,
+        questionIndexes: null,
+        currentRound: null,
+        finishedAt: null,
+      };
+
+      Object.entries(players).forEach(([playerId]) => {
+        updates[`players/${playerId}/score`] = 0;
+        updates[`players/${playerId}/isHost`] = playerId === room.hostId;
+      });
+
+      await db.ref(`rooms/${currentRoomCode}`).update(updates);
+      isHost = true;
+      showScreenSafe("room-screen");
+    } catch (error) {
+      console.warn("Failed to rematch room", error);
+      setLastFirebaseError(error);
+      setStatusMessage(multiRematchStatus, "다시 시작할 수 없습니다. 방 상태를 확인해주세요.", "error");
+    }
+  }
+
   function populateCategorySelect() {
     if (!multiCategorySelect || typeof categories === "undefined") return;
 
@@ -1647,6 +1721,13 @@
     });
 
     shareMultiResultBtn?.addEventListener("click", shareMultiplayerResult);
+
+    rematchRoomBtn?.addEventListener("click", () => {
+      rematchRoom().catch((error) => {
+        setLastFirebaseError(error);
+        setStatusMessage(multiRematchStatus, "다시 시작할 수 없습니다. 방 상태를 확인해주세요.", "error");
+      });
+    });
 
     startRoomGameBtn?.addEventListener("click", () => {
       startRoomGame().catch((error) => {

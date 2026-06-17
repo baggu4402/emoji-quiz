@@ -283,6 +283,10 @@
   margin-top: 8px;
 }
 
+.rematch-status {
+  color: var(--muted);
+}
+
 .rank-text {
   color: var(--primary-dark);
   font-weight: 900;
