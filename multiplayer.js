@@ -6,7 +6,7 @@
   const roundReadyMessage = "가장 먼저 맞히면 +10점";
   const ROUND_TIME_LIMIT_SECONDS = 20;
   const DEFAULT_QUESTION_LIMIT = 10;
-  const HINT_REVEAL_SECONDS = 5;
+  const HINT_REVEAL_REMAINING_SECONDS = 5;
   const AUTO_NEXT_DELAY_MS = 3000;
   const PRESENCE_CLEANUP_INTERVAL_MS = 10000;
   const OFFLINE_CLEANUP_MS = 2 * 60 * 1000;
@@ -1119,7 +1119,7 @@
 
   function getRemainingSeconds(currentRound = {}) {
     const startedAt = Number(currentRound.startedAt) || Date.now();
-    const timeLimitSeconds = currentRound.timeLimitSeconds || ROUND_TIME_LIMIT_SECONDS;
+    const timeLimitSeconds = Number(currentRound.timeLimitSeconds) || ROUND_TIME_LIMIT_SECONDS;
     const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
 
     return Math.max(0, timeLimitSeconds - elapsedSeconds);
@@ -1129,7 +1129,7 @@
     if (!multiTimerText) return;
 
     multiTimerText.textContent = `남은 시간 ${remainingSeconds}초`;
-    multiTimerText.classList.toggle("danger", remainingSeconds <= 5);
+    multiTimerText.classList.toggle("danger", remainingSeconds <= HINT_REVEAL_REMAINING_SECONDS);
   }
 
   function stopMultiplayerTimer() {
@@ -1265,11 +1265,25 @@
     });
   }
 
-  async function revealRoundHint(room) {
+  async function revealRoundHint(room, remainingSeconds = getRemainingSeconds(room?.currentRound || {})) {
     if (!isHost || !currentRoomCode || !db) return;
+
+    const round = room?.currentRound || {};
+    if (
+      remainingSeconds > HINT_REVEAL_REMAINING_SECONDS ||
+      round.winnerId ||
+      round.isTimeOver ||
+      round.hintShown
+    ) {
+      return;
+    }
 
     await db.ref(`rooms/${currentRoomCode}/currentRound`).transaction((currentRound) => {
       if (!currentRound || currentRound.winnerId || currentRound.isTimeOver || currentRound.hintShown) {
+        return currentRound;
+      }
+
+      if (getRemainingSeconds(currentRound) > HINT_REVEAL_REMAINING_SECONDS) {
         return currentRound;
       }
 
@@ -1296,8 +1310,14 @@
 
       renderTimerText(remainingSeconds);
 
-      if (isHost && remainingSeconds <= HINT_REVEAL_SECONDS && !currentRound.hintShown) {
-        revealRoundHint(room).catch(setLastFirebaseError);
+      if (
+        isHost &&
+        remainingSeconds <= HINT_REVEAL_REMAINING_SECONDS &&
+        !currentRound.winnerId &&
+        !currentRound.isTimeOver &&
+        !currentRound.hintShown
+      ) {
+        revealRoundHint(room, remainingSeconds).catch(setLastFirebaseError);
       }
 
       if (remainingSeconds <= 0) {
