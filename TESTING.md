@@ -55,7 +55,15 @@
 - [ ] 디버그 패널 상태 표시 정상
 - [ ] 버그 리포트 복사 정상
 
-## 6. 오류 발생 시 기록
+## 6. 테스트 후 정리할 것
+
+- [ ] Firebase Console > Realtime Database > `feedbacks` 경로 확인
+- [ ] `answer_request` 중 answers 배열에 추가할 후보 정리
+- [ ] `question_report` 중 emoji, hint, difficulty 수정 후보 정리
+- [ ] 중복/반복 제보 우선순위 표시
+- [ ] 반영한 문제는 싱글/멀티에서 다시 확인
+
+## 7. 오류 발생 시 기록
 
 문제 상황:
 
