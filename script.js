@@ -1,4 +1,5 @@
-const APP_VERSION = "v0.9.0-beta";
+const APP_VERSION = "v0.9.5-beta";
+const APP_BUILD_DATE = "2026-06-17";
 const QUESTION_LIMIT = 10;
 const BEST_SCORE_KEY = "emojiQuizBestScore";
 const SOUND_ENABLED_KEY = "emojiQuizSoundEnabled";
@@ -2618,7 +2619,7 @@ function setStatusMessage(element, text, type = "") {
 
 function updateVersionUI() {
   if (appVersionText) {
-    appVersionText.textContent = APP_VERSION;
+    appVersionText.textContent = `${APP_VERSION} · ${APP_BUILD_DATE}`;
   }
 }
 
